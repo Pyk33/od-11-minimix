@@ -1,0 +1,6 @@
+luma.oled
+Pillow
+gpiozero
+lgpio
+pyalsaaudio
+websocket-client

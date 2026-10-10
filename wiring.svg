@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 820" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1000" height="820" fill="#ffffff"/>
+  <text x="500" y="34" text-anchor="middle" font-size="22" font-weight="bold" fill="#111">OD-11 Minimix – kopplingsschema</text>
+  <text x="500" y="56" text-anchor="middle" font-size="13" fill="#555">Stäng av Pi:n vid omkoppling. Pinnummer = fysiska pinnar på Pi:ns header (GeeekPi-plintarna har samma GPIO-namn).</text>
+
+  <!-- Pi -->
+  <rect x="40" y="80" width="260" height="655" rx="10" fill="#f4f4f4" stroke="#111" stroke-width="2"/>
+  <text x="170" y="104" text-anchor="middle" font-size="15" font-weight="bold" fill="#111">Raspberry Pi 4 + GeeekPi HAT</text>
+
+  <g font-size="13" fill="#111" text-anchor="end">
+    <text x="280" y="145">3V3 (pin 1)</text>
+    <text x="280" y="195">GPIO2 SDA (pin 3)</text>
+    <text x="280" y="245">GPIO3 SCL (pin 5)</text>
+    <text x="280" y="295">GND (pin 9)</text>
+    <text x="280" y="385">5V (pin 2)</text>
+    <text x="280" y="435">GPIO17 (pin 11)</text>
+    <text x="280" y="485">GPIO27 (pin 13)</text>
+    <text x="280" y="535">GND (pin 14)</text>
+    <text x="280" y="615">GPIO22 (pin 15)</text>
+    <text x="280" y="665">GPIO23 (pin 16)</text>
+    <text x="280" y="715">GND (pin 20)</text>
+  </g>
+  <!-- NOTE: label rows are +? above the wire rows; terminals are drawn at wire y below -->
+  <g fill="#111">
+    <circle cx="300" cy="140" r="5"/><circle cx="300" cy="190" r="5"/><circle cx="300" cy="240" r="5"/><circle cx="300" cy="290" r="5"/>
+    <circle cx="300" cy="380" r="5"/><circle cx="300" cy="430" r="5"/><circle cx="300" cy="480" r="5"/><circle cx="300" cy="530" r="5"/>
+    <circle cx="300" cy="610" r="5"/><circle cx="300" cy="660" r="5"/><circle cx="300" cy="710" r="5"/>
+  </g>
+
+  <!-- OLED -->
+  <rect x="700" y="115" width="230" height="200" rx="10" fill="#eef5ff" stroke="#111" stroke-width="2"/>
+  <text x="815" y="140" text-anchor="middle" font-size="15" font-weight="bold">OLED 1,3" (I2C, 0x3C)</text>
+  <g font-size="13" fill="#111">
+    <text x="715" y="145">VCC</text><text x="715" y="195">SDA</text><text x="715" y="245">SCL</text><text x="715" y="295">GND</text>
+  </g>
+  <line x1="300" y1="140" x2="700" y2="140" stroke="#e67e00" stroke-width="3"/>
+  <line x1="300" y1="190" x2="700" y2="190" stroke="#1f6fe0" stroke-width="3"/>
+  <line x1="300" y1="240" x2="700" y2="240" stroke="#d4b100" stroke-width="3"/>
+  <line x1="300" y1="290" x2="700" y2="290" stroke="#111" stroke-width="3"/>
+  <text x="500" y="133" text-anchor="middle" font-size="12" fill="#e67e00">3,3 V</text>
+
+  <!-- Encoder -->
+  <rect x="700" y="345" width="230" height="215" rx="10" fill="#fff4e8" stroke="#111" stroke-width="2"/>
+  <text x="815" y="368" text-anchor="middle" font-size="15" font-weight="bold">Encoder LPD3806-600</text>
+  <g font-size="13" fill="#111">
+    <text x="715" y="385">VCC (röd)</text><text x="715" y="435">A (grön)</text><text x="715" y="485">B (vit)</text><text x="715" y="535">GND (svart)</text>
+  </g>
+  <line x1="300" y1="380" x2="700" y2="380" stroke="#d11a1a" stroke-width="3"/>
+  <line x1="300" y1="430" x2="700" y2="430" stroke="#1a9d3c" stroke-width="3"/>
+  <line x1="300" y1="480" x2="700" y2="480" stroke="#888" stroke-width="3"/>
+  <line x1="300" y1="530" x2="700" y2="530" stroke="#111" stroke-width="3"/>
+  <text x="500" y="373" text-anchor="middle" font-size="12" fill="#d11a1a">5 V (inte 3,3 V)</text>
+  <text x="500" y="500" text-anchor="middle" font-size="11" fill="#555">(valfritt: 4,7 kΩ från A och B till 3V3)</text>
+
+  <!-- Buttons -->
+  <rect x="700" y="585" width="200" height="50" rx="8" fill="#eef9ee" stroke="#111" stroke-width="2"/>
+  <text x="800" y="606" text-anchor="middle" font-size="14" font-weight="bold">Knapp Play/Pause</text>
+  <text x="710" y="623" font-size="12">NO</text><text x="890" y="623" text-anchor="end" font-size="12">COM</text>
+  <rect x="700" y="640" width="200" height="50" rx="8" fill="#eef9ee" stroke="#111" stroke-width="2"/>
+  <text x="800" y="661" text-anchor="middle" font-size="14" font-weight="bold">Knapp Next</text>
+  <text x="710" y="678" font-size="12">NO</text><text x="890" y="678" text-anchor="end" font-size="12">COM</text>
+
+  <line x1="300" y1="610" x2="560" y2="610" stroke="#7b2fbf" stroke-width="3"/>
+  <line x1="560" y1="610" x2="560" y2="610" stroke="#7b2fbf" stroke-width="3"/>
+  <line x1="300" y1="660" x2="640" y2="660" stroke="#c2185b" stroke-width="3"/>
+  <!-- NO-wires: horisontella linjer slutar vid knapparna -->
+  <line x1="560" y1="610" x2="700" y2="610" stroke="#7b2fbf" stroke-width="3"/>
+  <line x1="640" y1="660" x2="700" y2="660" stroke="#c2185b" stroke-width="3"/>
+
+  <!-- GND-buss för knapparna (COM) -->
+  <line x1="900" y1="610" x2="960" y2="610" stroke="#111" stroke-width="3"/>
+  <line x1="900" y1="660" x2="960" y2="660" stroke="#111" stroke-width="3"/>
+  <line x1="960" y1="610" x2="960" y2="710" stroke="#111" stroke-width="3"/>
+  <line x1="300" y1="710" x2="960" y2="710" stroke="#111" stroke-width="3"/>
+  <text x="620" y="703" text-anchor="middle" font-size="12" fill="#111">GND till båda knapparnas COM</text>
+
+  <!-- Audio -->
+  <text x="500" y="745" text-anchor="middle" font-size="15" font-weight="bold">Ljud</text>
+  <g font-size="12" fill="#111" text-anchor="middle">
+    <rect x="40" y="760" width="150" height="44" rx="6" fill="#f4f4f4" stroke="#111"/><text x="115" y="786">Pi USB-A</text>
+    <rect x="240" y="760" width="170" height="44" rx="6" fill="#f4f4f4" stroke="#111"/><text x="325" y="786">Cubilux USB→TOSLINK</text>
+    <rect x="460" y="760" width="190" height="44" rx="6" fill="#f4f4f4" stroke="#111"/><text x="555" y="786">TOSLINK-kabel</text>
+    <rect x="700" y="760" width="260" height="44" rx="6" fill="#f4f4f4" stroke="#111"/><text x="830" y="786">OD-11 optisk ingång (undersidan)</text>
+  </g>
+  <g stroke="#111" stroke-width="2">
+    <line x1="190" y1="782" x2="240" y2="782"/><line x1="410" y1="782" x2="460" y2="782"/><line x1="650" y1="782" x2="700" y2="782"/>
+  </g>
+</svg>

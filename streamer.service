@@ -1,0 +1,16 @@
+[Unit]
+Description=Streamer OLED och hårdvarukontroll
+After=sound.target network.target go-librespot.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/streamer
+ExecStart=/home/pi/streamer/venv/bin/python3 /home/pi/streamer/streamer.py
+Restart=always
+RestartSec=2
+Nice=-5
+SupplementaryGroups=gpio i2c audio
+
+[Install]
+WantedBy=multi-user.target
