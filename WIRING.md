@@ -46,17 +46,17 @@ flowchart LR
     DAC -->|"TOSLINK-kabel"| OD
 ```
 
-## 1. OLED-skärm (I2C, adress 0x3C)
+## 1. OLED-skärm (1.3" I2C, adress 0x3C)
 
-| Skärm | Pi | Pin |
-|---|---|---|
-| VCC | 3V3 | 1 |
-| GND | GND | 9 |
-| SDA | GPIO2 | 3 |
-| SCL | GPIO3 | 5 |
+| Skärm | Din kabelfärg | Pi / GeeekPi HAT | Fysisk Pin |
+|---|---|---|---|
+| **VCC** | **Orange** | **3V3** *(OBS: 3.3V, inte 5V)* | Pin 1 |
+| **GND** | **Gul** | **GND** | Pin 9 (eller valfri GND) |
+| **SDA** | **Ljusbrun** | **GPIO2** (SDA) | Pin 3 |
+| **SCL** | **Röd** | **GPIO3** (SCL) | Pin 5 |
 
 > [!WARNING]
-> Använd **3,3 V** (pin 1), inte 5 V, om inte modulen uttryckligen är 5 V-säker med nivåskiftare. Kolla texten på kortet.
+> Använd **3,3 V** (pin 1), inte 5 V.
 
 Kontroll efter uppstart: `sudo i2cdetect -y 1` ska visa `3c`.
 
@@ -115,19 +115,19 @@ Officiella 15,3 W USB-C-adaptern till Pi:n. Encoder och skärm drar bara Pi:ns e
 
 ## Pinnöversikt (bara de som används)
 
-| Pin | Funktion | Går till |
-|---|---|---|
-| 1 | 3V3 | OLED VCC, pull-ups |
-| 2 | 5V | Encoder VCC |
-| 3 | GPIO2 SDA | OLED SDA |
-| 5 | GPIO3 SCL | OLED SCL |
-| 9 | GND | OLED GND |
-| 11 | GPIO17 | Encoder A |
-| 13 | GPIO27 | Encoder B |
-| 14 | GND | Encoder GND |
-| 15 | GPIO22 | Knapp Play/Pause |
-| 16 | GPIO23 | Knapp Next |
-| 20 | GND | Knappar COM |
+| Pin | Funktion | Går till | Kabelfärg |
+|---|---|---|---|
+| 1 | 3V3 | OLED VCC | **Orange** |
+| 2 | 5V | Encoder VCC | Röd |
+| 3 | GPIO2 SDA | OLED SDA | **Ljusbrun** |
+| 5 | GPIO3 SCL | OLED SCL | **Röd** |
+| 9 | GND | OLED GND | **Gul** |
+| 11 | GPIO17 | Encoder A | Grön |
+| 13 | GPIO27 | Encoder B | Vit |
+| 14 | GND | Encoder GND | Svart |
+| 15 | GPIO22 | Knapp Play/Pause | |
+| 16 | GPIO23 | Knapp Next | |
+| 20 | GND | Knappar COM | |
 
 ## Tips för 3D-printad låda
 
