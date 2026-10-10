@@ -53,7 +53,7 @@ pcm.dmixed {
     ipc_perm 0666
     slave {
         pcm "dac"
-        rate 44100
+        rate 48000
         format S16_LE
         period_size 1024
         buffer_size 4096
