@@ -43,8 +43,8 @@ MIXER_CONTROL = "Master"          # softvol-kontroll skapad av /etc/asound.conf
 MIXER_DEVICE = "default"
 VOL_MAX = int(os.environ.get("VOL_MAX", "85"))     # skydd för OD-11
 VOL_DEFAULT = int(os.environ.get("VOL_DEFAULT", "25"))
-ENC_STEPS_PER_PERCENT = float(os.environ.get("ENC_STEPS_PER_PERCENT", "24"))
-# LPD3806-600: 600 pulser/varv x4 flanker = 2400 steg/varv. 24 steg/% => ~1 varv = 100 %.
+ENC_STEPS_PER_PERCENT = float(os.environ.get("ENC_STEPS_PER_PERCENT", "48"))
+# LPD3806-600: 48 steg/% => mjuk och precis volymkontroll.
 # Justera efter känsla (högre tal = mjukare, lägre = känsligare).
 LONG_PRESS_S = 0.7
 SHUTDOWN_HOLD_S = 3.0             # håll båda knapparna så länge för att stänga av
@@ -164,14 +164,14 @@ def on_rotated():
     """Körs i gpiozeros tråd – håll den snabb."""
     global _enc_remainder, _last_rot
     now = time.monotonic()
-    steps = encoder.steps
+    steps = -encoder.steps
     encoder.steps = 0
     if steps == 0:
         return
-    # Lätt acceleration: snabb vridning ger större steg
+    # Mjuk acceleration
     dt = now - _last_rot
     _last_rot = now
-    gain = 1.0 if dt > 0.05 else (1.6 if dt > 0.02 else 2.4)
+    gain = 1.0 if dt > 0.04 else (1.3 if dt > 0.02 else 1.6)
     _enc_remainder += steps * gain / ENC_STEPS_PER_PERCENT
     whole = int(_enc_remainder)
     if whole == 0:
@@ -510,8 +510,8 @@ def render(t):
         animating |= marquee(d, (2, 16), s["title"].upper() or "-", F_MD, W - 4, t)
         animating |= marquee(d, (2, 33), s["artist"].upper() or "-", F_SM, W - 4, t)
     else:
-        d.text((2, 20), "TEENAGE", font=F_MD, fill=255)
-        d.text((2, 35), "STREAMER", font=F_MD, fill=255)
+        d.text((2, 20), "OLLE'S", font=F_MD, fill=255)
+        d.text((2, 35), "MINIMIX", font=F_MD, fill=255)
 
     # --- Progress (1 px linje med markör) ---------------------------------------
     if s["dur_ms"] > 0:
