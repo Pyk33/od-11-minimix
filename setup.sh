@@ -66,7 +66,7 @@ pcm.softvol {
         name "Master"
         card "$CARD"
     }
-    min_dB -40.0
+    min_dB -60.0
     max_dB 0.0
     resolution 101
 }
@@ -80,19 +80,17 @@ ctl.!default {
 }
 EOF
 # Skapa softvol-kontrollen direkt (annars finns den först efter första uppspelning)
-aplay -q -D default -d 1 -f S16_LE -r 44100 -c 2 /dev/zero 2>/dev/null || true
+aplay -q -D default -d 1 -f S16_LE -r 48000 -c 2 /dev/zero 2>/dev/null || true
 
 echo "=== 4. AirPlay (shairport-sync) ==="
 sudo tee /etc/shairport-sync.conf >/dev/null <<'EOF'
 general = {
     name = "Olle's Mini-Mix";
     output_backend = "alsa";
-    ignore_volume_control = "no";   // iPhonens volym styr samma ALSA-reglage som encodern
+    ignore_volume_control = "no";   // iPhonens volymknappar reglerar AirPlay-ljudet direkt
 };
 alsa = {
     output_device = "default";
-    mixer_control_name = "Master";
-    mixer_device = "default";
 };
 EOF
 sudo usermod -aG audio shairport-sync || true
