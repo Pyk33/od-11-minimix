@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Olle's Mini-Mix — Teenage Engineering OB-4 & OD-11 Manual</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0c0d10;
+      --surface: #14161b;
+      --surface-2: #1b1e25;
+      --surface-3: #242832;
+      --border: #2a2e3a;
+      --border-bright: #3d4354;
+      --text: #f0f2f5;
+      --text-muted: #8e95a5;
+      --text-dim: #5c6272;
+      --accent-orange: #ff4d15;
+      --accent-orange-glow: rgba(255, 77, 21, 0.25);
+      --accent-yellow: #f8cf40;
+      --accent-cyan: #00d2ff;
+      --oled-bg: #040608;
+      --oled-pixel: #eef2f7;
+      --oled-glow: rgba(238, 242, 247, 0.15);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      padding: 0;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(255, 77, 21, 0.08) 0%, transparent 60%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 32px 32px, 32px 32px;
+    }
+
+    /* Container */
+    .app-container {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 40px 24px 100px;
+    }
+
+    /* Header & Branding */
+    header.hero {
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .badge-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 4px;
+      background: var(--surface-3);
+      color: var(--text);
+      border: 1px solid var(--border);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill.pill-orange {
+      background: rgba(255, 77, 21, 0.15);
+      color: var(--accent-orange);
+      border-color: rgba(255, 77, 21, 0.4);
+    }
+
+    .pill.pill-cyan {
+      background: rgba(0, 210, 255, 0.12);
+      color: var(--accent-cyan);
+      border-color: rgba(0, 210, 255, 0.3);
+    }
+
+    .pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    h1.title {
+      font-size: clamp(32px, 5vw, 54px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: #fff;
+    }
+
+    h1.title span {
+      color: var(--accent-orange);
+    }
+
+    p.subtitle {
+      font-size: 17px;
+      color: var(--text-muted);
+      max-width: 720px;
+      line-height: 1.5;
+    }
+
+    /* Device Simulator Section */
+    .simulator-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 60px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .simulator-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .simulator-title {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .simulator-title::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--accent-orange);
+      border-radius: 2px;
+    }
+
+    .sim-controls-hint {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* Physical Unit Layout */
+    .minimix-chassis {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      padding: 30px;
+      background: linear-gradient(145deg, #181b22, #111317);
+      border: 2px solid #2d323e;
+      border-radius: 20px;
+      box-shadow: inset 0 2px 10px rgba(255, 255, 255, 0.05), 0 12px 30px rgba(0, 0, 0, 0.6);
+    }
+
+    /* 1.3" OLED Screen */
+    .oled-screen-frame {
+      width: 280px;
+      height: 140px;
+      background: #08090c;
+      border: 4px solid #1a1c23;
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.9), 0 4px 14px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      user-select: none;
+    }
+
+    .oled-display {
+      width: 100%;
+      height: 100%;
+      background: var(--oled-bg);
+      border-radius: 3px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      color: var(--oled-pixel);
+      text-shadow: 0 0 4px var(--oled-glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Pixel screen scanline overlay */
+    .oled-display::after {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 3px;
+      pointer-events: none;
+    }
+
+    .oled-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(238, 242, 247, 0.3);
+      padding-bottom: 4px;
+    }
+
+    .oled-badge {
+      background: var(--oled-pixel);
+      color: #000;
+      padding: 1px 4px;
+      border-radius: 2px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .oled-center {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 60px;
+    }
+
+    .oled-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+
+    .oled-artist {
+      font-size: 12px;
+      opacity: 0.8;
+      letter-spacing: 0.02em;
+    }
+
+    .oled-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      border-top: 1px solid rgba(238, 242, 247, 0.2);
+      padding-top: 4px;
+    }
+
+    /* OLED Reels Graphic */
+    .reel-container {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      width: 100%;
+      height: 48px;
+      position: relative;
+    }
+
+    .tape-line {
+      position: absolute;
+      top: 14px;
+      left: 36px;
+      right: 36px;
+      height: 1px;
+      background: var(--oled-pixel);
+      opacity: 0.6;
+    }
+
+    .tape-line.bottom {
+      top: 36px;
+    }
+
+    .reel {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--oled-pixel);
+      border-radius: 50%;
+      position: relative;
+      animation: spin 3s linear infinite;
+    }
+
+    .reel-hub {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background: var(--oled-pixel);
+      border-radius: 50%;
+    }
+
+    .reel-spoke {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 14px;
+      height: 1px;
+      background: var(--oled-pixel);
+      transform-origin: left center;
+    }
+
+    .spoke-1 { transform: rotate(0deg); }
+    .spoke-2 { transform: rotate(120deg); }
+    .spoke-3 { transform: rotate(240deg); }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Rotary Encoder Hardware Widget */
+    .encoder-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .encoder-dial {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #4a5061 0%, #1e222b 60%, #14171d 100%);
+      border: 3px solid #3d4352;
+      box-shadow: 
+        0 10px 20px rgba(0, 0, 0, 0.6),
+        inset 0 2px 4px rgba(255, 255, 255, 0.2),
+        inset 0 -4px 8px rgba(0, 0, 0, 0.7);
+      position: relative;
+      cursor: grab;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.05s ease-out;
+    }
+
+    .encoder-dial:active {
+      cursor: grabbing;
+    }
+
+    .knurling {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.06) 0deg 4deg, transparent 4deg 8deg);
+      pointer-events: none;
+    }
+
+    .dial-indicator {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-orange);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent-orange);
+      position: absolute;
+      top: 14px;
+    }
+
+    .encoder-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* Pushbuttons Widget */
+    .buttons-panel {
+      display: flex;
+      gap: 20px;
+    }
+
+    .hardware-button-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hardware-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #2b303c, #161920);
+      border: 2px solid #4a5163;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), inset 0 2px 3px rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.1s ease;
+      position: relative;
+    }
+
+    .hardware-btn:active, .hardware-btn.pressed {
+      transform: translateY(3px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8), inset 0 2px 6px rgba(0, 0, 0, 0.6);
+      border-color: var(--accent-orange);
+    }
+
+    .btn-led-ring {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #101217;
+      border: 1px solid #3d4352;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .hardware-btn:hover .btn-led-ring {
+      color: #fff;
+    }
+
+    .hardware-btn.active .btn-led-ring {
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 8px var(--accent-orange-glow);
+      color: var(--accent-orange);
+    }
+
+    .btn-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    /* Interactive mode selector bar below simulator */
+    .sim-mode-switcher {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+
+    .mode-tab-btn {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 8px 16px;
+      border-radius: 6px;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-tab-btn:hover {
+      background: var(--surface-3);
+      color: #fff;
+      border-color: var(--border-bright);
+    }
+
+    .mode-tab-btn.active {
+      background: var(--accent-orange);
+      color: #fff;
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 14px var(--accent-orange-glow);
+    }
+
+    /* Section Styles */
+    section.content-section {
+      margin-bottom: 56px;
+    }
+
+    h2.section-heading {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fff;
+    }
+
+    h2.section-heading::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Grid for Modes */
+    .mode-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .mode-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .mode-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-bright);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-orange);
+      font-size: 18px;
+    }
+
+    h3.card-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    p.card-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .card-actions {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+    }
+
+    .action-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .action-label {
+      color: var(--text-dim);
+    }
+
+    .action-val {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Wiring & Terminal Matrix */
+    .table-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    table.wiring-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+
+    table.wiring-table th {
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.wiring-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    table.wiring-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.wiring-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .terminal-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--surface-3);
+      color: #fff;
+      border: 1px solid var(--border-bright);
+    }
+
+    .color-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+
+    .color-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    /* Terminal Command Box */
+    .cmd-box {
+      background: #08090d;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #92e0ff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      gap: 16px;
+    }
+
+    .cmd-text {
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    .copy-btn {
+      background: var(--surface-3);
+      border: 1px solid var(--border-bright);
+      color: #fff;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover {
+      background: var(--accent-orange);
+      border-color: var(--accent-orange);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 80px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    footer a {
+      color: var(--accent-orange);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- Header -->
+    <header class="hero">
+      <div class="badge-bar">
+        <span class="pill pill-orange"><span class="dot"></span> OLLE'S MINI-MIX</span>
+        <span class="pill pill-cyan">TEENAGE ENGINEERING OD-11</span>
+        <span class="pill">OB-4 MAGIC TAPE V2.0</span>
+        <span class="pill">48 KHZ S/PDIF TOSLINK</span>
+      </div>
+      <h1 class="title">Taktil Ljudstreamer & <span>OB-4 Magic Tape</span></h1>
+      <p class="subtitle">
+        En handbyggd, minimalistisk streamer inspirerad av Teenage Engineering OB-4 och OD-11. Utrustad med kontinuerlig 15-minuters bandbuffert i RAM, vari-speed tape scrub, instant looper och ambient drönarsyntes.
+      </p>
+    </header>
+
+    <!-- Interactive Simulator -->
+    <div class="simulator-wrap">
+      <div class="simulator-header">
+        <span class="simulator-title">Interaktiv Hårdvarusimulator</span>
+        <span class="sim-controls-hint">Klicka knapparna eller vrid ratten för att testa lägena</span>
+      </div>
+
+      <div class="minimix-chassis">
+
+        <!-- 1.3" OLED Display -->
+        <div class="oled-screen-frame">
+          <div class="oled-display" id="simOled">
+            <!-- Top bar -->
+            <div class="oled-top">
+              <span class="oled-badge" id="simBadge">VOL</span>
+              <span id="simTopRight">SPOTIFY  PLAY</span>
+            </div>
+
+            <!-- Middle graphic/text -->
+            <div class="oled-center" id="simCenter">
+              <div class="oled-title" id="simTitle">OLLE'S MINIMIX</div>
+              <div class="oled-artist" id="simArtist">TEENAGE OD-11</div>
+            </div>
+
+            <!-- Bottom bar -->
+            <div class="oled-bottom">
+              <span id="simBottomLeft">1:24 / 3:45</span>
+              <span id="simBottomRight">VOL 75</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Push Buttons (IO22 & IO23) -->
+        <div class="buttons-panel">
+          <div class="hardware-button-wrap">
+            <button class="hardware-btn" id="btnPlay" title="Play/Pause / Tape Stop (IO22)">
+              <div class="btn-led-ring">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </div>
+            </button>
+            <span class="btn-title">PLAY / PAUSE</span>
+          </div>
+
+          <div class="hardware-button-wrap">
+            <button class="hardware-btn" id="btnNext" title="Next / Mode Switch (IO23)">
+              <div class="btn-led-ring">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+                </svg>
+              </div>
+            </button>
+            <span class="btn-title">NEXT / MODE</span>
+          </div>
+        </div>
+
+        <!-- Rotary Encoder (IO17 & IO27) -->
+        <div class="encoder-panel">
+          <div class="encoder-dial" id="encoderDial" title="Vrid för volym eller spolning">
+            <div class="knurling"></div>
+            <div class="dial-indicator" id="dialIndicator"></div>
+          </div>
+          <span class="encoder-label">OPTICAL ENCODER</span>
+        </div>
+
+      </div>
+
+      <!-- Mode selector buttons -->
+      <div class="sim-mode-switcher">
+        <button class="mode-tab-btn active" onclick="setMode('VOL')">1. VOL (LIVE)</button>
+        <button class="mode-tab-btn" onclick="setMode('TAPE')">2. TAPE (SCRUB & REWIND)</button>
+        <button class="mode-tab-btn" onclick="setMode('LOOP')">3. LOOP (INSTANT LOOPER)</button>
+        <button class="mode-tab-btn" onclick="setMode('AMBIENT')">4. AMBIENT (DRONE)</button>
+      </div>
+    </div>
+
+    <!-- Quick Reference Guide Section -->
+    <section class="content-section">
+      <h2 class="section-heading">Lägen & Kontrollmatris</h2>
+
+      <div class="mode-cards-grid">
+
+        <!-- Card 1: VOL -->
+        <div class="mode-card">
+          <div class="card-top">
+            <h3 class="card-title">VOL (Live Streaming)</h3>
+            <div class="card-icon">🔊</div>
+          </div>
+          <p class="card-desc">
+            Standardläget vid boot. Skickar realtidsström från Spotify Connect eller AirPlay till OD-11 med noll fördröjning.
+          </p>
+          <div class="card-actions">
+            <div class="action-row"><span class="action-label">Ratten:</span> <span class="action-val">Master Volym (0–85%)</span></div>
+            <div class="action-row"><span class="action-label">Play (Klick):</span> <span class="action-val">Play / Pause</span></div>
+            <div class="action-row"><span class="action-label">Play (Håll 0.7s):</span> <span class="action-val">Mute / Unmute</span></div>
+            <div class="action-row"><span class="action-label">Next (Klick):</span> <span class="action-val">Nästa låt</span></div>
+            <div class="action-row"><span class="action-label">Next (Håll 0.7s):</span> <span class="action-val" style="color:var(--accent-orange)">Växla till TAPE!</span></div>
+          </div>
+        </div>
+
+        <!-- Card 2: TAPE -->
+        <div class="mode-card">
+          <div class="card-top">
+            <h3 class="card-title">TAPE (Magic Tape)</h3>
+            <div class="card-icon">📼</div>
+          </div>
+          <p class="card-desc">
+            Rullande 15-minuters bandminne. Spola bakåt i tiden i realtid med autentisk bandpitch, scratch-känsla och tröghetsmoment.
+          </p>
+          <div class="card-actions">
+            <div class="action-row"><span class="action-label">Ratten:</span> <span class="action-val">Spola bakåt / framåt</span></div>
+            <div class="action-row"><span class="action-label">Play (Klick):</span> <span class="action-val">Tape Stop / Resume</span></div>
+            <div class="action-row"><span class="action-label">Play (Håll 0.7s):</span> <span class="action-val" style="color:var(--accent-cyan)">JUMP TO LIVE!</span></div>
+            <div class="action-row"><span class="action-label">Next (Klick):</span> <span class="action-val">Växla till LOOP</span></div>
+            <div class="action-row"><span class="action-label">Next (Håll 0.7s):</span> <span class="action-val">Återgå till VOL</span></div>
+          </div>
+        </div>
+
+        <!-- Card 3: LOOP -->
+        <div class="mode-card">
+          <div class="card-top">
+            <h3 class="card-title">LOOP (Instant Looper)</h3>
+            <div class="card-icon">🔁</div>
+          </div>
+          <p class="card-desc">
+            Fångar en loop av musiken och upprepar den med klickfria crossfades. Stega från 16 sekunder ner till 1/8 sekund snabb stutter.
+          </p>
+          <div class="card-actions">
+            <div class="action-row"><span class="action-label">Ratten:</span> <span class="action-val">Ändra looplängd (16s ➔ 1/8s)</span></div>
+            <div class="action-row"><span class="action-label">Play (Klick):</span> <span class="action-val">Freeze / Bypass</span></div>
+            <div class="action-row"><span class="action-label">Play (Håll 0.7s):</span> <span class="action-val">Reverse Loop (baklänges)</span></div>
+            <div class="action-row"><span class="action-label">Next (Klick):</span> <span class="action-val">Växla till AMBIENT</span></div>
+            <div class="action-row"><span class="action-label">Next (Håll 0.7s):</span> <span class="action-val">Återgå till VOL</span></div>
+          </div>
+        </div>
+
+        <!-- Card 4: AMBIENT -->
+        <div class="mode-card">
+          <div class="card-top">
+            <h3 class="card-title">AMBIENT (Disk Drone)</h3>
+            <div class="card-icon">✨</div>
+          </div>
+          <p class="card-desc">
+            4-stämmig Hann-fönstrad granulsyntes. Fryser ett ögonblick av musiken till en oändlig harmonisk ambient drönare.
+          </p>
+          <div class="card-actions">
+            <div class="action-row"><span class="action-label">Ratten:</span> <span class="action-val">Modulera klangfärg & filter</span></div>
+            <div class="action-row"><span class="action-label">Play (Klick):</span> <span class="action-val">Frys ny klang från musiken</span></div>
+            <div class="action-row"><span class="action-label">Next (Klick):</span> <span class="action-val">Återgå till VOL</span></div>
+            <div class="action-row"><span class="action-label">Next (Håll 0.7s):</span> <span class="action-val">Återgå till VOL</span></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Hardware Wiring Section -->
+    <section class="content-section">
+      <h2 class="section-heading">Kopplingsschema & Terminal HAT</h2>
+
+      <div class="table-container">
+        <table class="wiring-table">
+          <thead>
+            <tr>
+              <th>Komponent</th>
+              <th>Funktion</th>
+              <th>Färg på kabel</th>
+              <th>GeeekPi HAT-plint</th>
+              <th>BCM GPIO</th>
+              <th>Notering</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- OLED -->
+            <tr>
+              <td><strong>1.3" I2C OLED</strong></td>
+              <td>VCC (+3.3V)</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#ff8c00"></span> Orange</span></td>
+              <td><span class="terminal-badge">3V3</span></td>
+              <td>Pin 1</td>
+              <td>Koppla INTE till 5V!</td>
+            </tr>
+            <tr>
+              <td>1.3" I2C OLED</td>
+              <td>GND</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#ffd700"></span> Gul</span></td>
+              <td><span class="terminal-badge">GND</span></td>
+              <td>Pin 9</td>
+              <td>Gemensam jord</td>
+            </tr>
+            <tr>
+              <td>1.3" I2C OLED</td>
+              <td>SDA (Data)</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#8b5a2b"></span> Ljusbrun</span></td>
+              <td><span class="terminal-badge">SDA</span></td>
+              <td>GPIO 2 (Pin 3)</td>
+              <td>400 kHz fast I2C-buss</td>
+            </tr>
+            <tr>
+              <td>1.3" I2C OLED</td>
+              <td>SCL (Klocka)</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#ff2222"></span> Röd</span></td>
+              <td><span class="terminal-badge">SCL</span></td>
+              <td>GPIO 3 (Pin 5)</td>
+              <td>Hårdvaru I2C</td>
+            </tr>
+
+            <!-- Rotary Encoder -->
+            <tr>
+              <td><strong>LPD3806 Encoder</strong></td>
+              <td>VCC (+5V)</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#ff3333"></span> Röd</span></td>
+              <td><span class="terminal-badge">5V</span></td>
+              <td>Pin 2 / 4</td>
+              <td>Mata optisk givare med 5V</td>
+            </tr>
+            <tr>
+              <td>LPD3806 Encoder</td>
+              <td>GND</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#111"></span> Svart</span></td>
+              <td><span class="terminal-badge">GND</span></td>
+              <td>Pin 6</td>
+              <td>Gemensam jord</td>
+            </tr>
+            <tr>
+              <td>LPD3806 Encoder</td>
+              <td>Fas A</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#00cc66"></span> Grön</span></td>
+              <td><span class="terminal-badge">IO17</span></td>
+              <td>GPIO 17 (Pin 11)</td>
+              <td>Intern pull-up till 3.3V</td>
+            </tr>
+            <tr>
+              <td>LPD3806 Encoder</td>
+              <td>Fas B</td>
+              <td><span class="color-chip"><span class="color-swatch" style="background:#ffffff"></span> Vit</span></td>
+              <td><span class="terminal-badge">IO27</span></td>
+              <td>GPIO 27 (Pin 13)</td>
+              <td>Intern pull-up till 3.3V</td>
+            </tr>
+
+            <!-- Knappar -->
+            <tr>
+              <td><strong>Play/Pause Knapp</strong></td>
+              <td>NO + C</td>
+              <td>Metallknapp</td>
+              <td><span class="terminal-badge">IO22 + GND</span></td>
+              <td>GPIO 22 (Pin 15)</td>
+              <td>NC lämnas okopplad</td>
+            </tr>
+            <tr>
+              <td><strong>Next / Mode Knapp</strong></td>
+              <td>NO + C</td>
+              <td>Metallknapp</td>
+              <td><span class="terminal-badge">IO23 + GND</span></td>
+              <td>GPIO 23 (Pin 16)</td>
+              <td>NC lämnas okopplad</td>
+            </tr>
+
+            <!-- Ljud -->
+            <tr>
+              <td><strong>Cubilux USB DAC</strong></td>
+              <td>S/PDIF Optisk</td>
+              <td>TOSLINK fiber</td>
+              <td>USB 2.0 Port</td>
+              <td>ALSA Card 0</td>
+              <td>Optisk kabel till OD-11 (48 kHz)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Shell Setup Guide Section -->
+    <section class="content-section">
+      <h2 class="section-heading">Provisionering & SSH-kommandon</h2>
+      <p style="color:var(--text-muted); font-size:14px; margin-bottom:12px;">
+        När du kopplar in Pi:n i chassit igen kör du dessa kommandon från din Mac för att synka och starta alla tjänster:
+      </p>
+
+      <div class="cmd-box">
+        <span class="cmd-text">ssh pyken@minimix.local "cd ~/streamer && git pull && bash setup.sh"</span>
+        <button class="copy-btn" onclick="copyCmd(this)">Kopiera</button>
+      </div>
+
+      <div class="cmd-box" style="margin-top:10px;">
+        <span class="cmd-text">ssh pyken@minimix.local "journalctl -u streamer.service -f"</span>
+        <button class="copy-btn" onclick="copyCmd(this)">Kopiera</button>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <div>OLLE'S MINI-MIX • TEENAGE ENGINEERING OB-4 ENGINE</div>
+      <div>Källkod spåras på GitHub: <a href="https://github.com/Pyk33/od-11-minimix.git" target="_blank">Pyk33/od-11-minimix</a></div>
+    </footer>
+
+  </div>
+
+  <!-- Interactive Simulator Script -->
+  <script>
+    let currentMode = 'VOL';
+    let isPlaying = true;
+    let volume = 75;
+    let loopLength = 2.0;
+    let dialAngle = 0;
+    let isMouseDown = false;
+    let lastY = 0;
+
+    const oledBadge = document.getElementById('simBadge');
+    const oledTopRight = document.getElementById('simTopRight');
+    const oledCenter = document.getElementById('simCenter');
+    const oledBottomLeft = document.getElementById('simBottomLeft');
+    const oledBottomRight = document.getElementById('simBottomRight');
+    const encoderDial = document.getElementById('encoderDial');
+    const btnPlay = document.getElementById('btnPlay');
+    const btnNext = document.getElementById('btnNext');
+
+    function updateOled() {
+      oledBadge.textContent = currentMode;
+
+      if (currentMode === 'VOL') {
+        oledTopRight.textContent = isPlaying ? "SPOTIFY PLAY" : "SPOTIFY PAUSE";
+        oledCenter.innerHTML = `
+          <div class="oled-title">OLLE'S MINIMIX</div>
+          <div class="oled-artist">TEENAGE OD-11</div>
+        `;
+        oledBottomLeft.textContent = "1:24 / 3:45";
+        oledBottomRight.textContent = "VOL " + volume;
+      } 
+      else if (currentMode === 'TAPE') {
+        oledTopRight.textContent = "-00:24 LIVE";
+        oledCenter.innerHTML = `
+          <div class="reel-container">
+            <div class="tape-line"></div>
+            <div class="tape-line bottom"></div>
+            <div class="reel">
+              <div class="reel-hub"></div>
+              <div class="reel-spoke spoke-1"></div>
+              <div class="reel-spoke spoke-2"></div>
+              <div class="reel-spoke spoke-3"></div>
+            </div>
+            <div style="font-size:12px; font-weight:800; border:1px solid #fff; padding:2px 6px;">[ TAPE HEAD ]</div>
+            <div class="reel">
+              <div class="reel-hub"></div>
+              <div class="reel-spoke spoke-1"></div>
+              <div class="reel-spoke spoke-2"></div>
+              <div class="reel-spoke spoke-3"></div>
+            </div>
+          </div>
+        `;
+        oledBottomLeft.textContent = isPlaying ? "SPEED 1.0x" : "STOPPED";
+        oledBottomRight.textContent = "KNOB:SCRUB";
+      }
+      else if (currentMode === 'LOOP') {
+        oledTopRight.textContent = "ACTIVE";
+        oledCenter.innerHTML = `
+          <div style="font-size:13px; font-weight:700; margin-bottom:4px;">LENGTH: ${loopLength}s</div>
+          <div style="width:160px; height:18px; border:1px solid #fff; position:relative; overflow:hidden;">
+            <div style="position:absolute; left:40%; top:0; bottom:0; width:2px; background:#fff; box-shadow:0 0 4px #fff;"></div>
+            <div style="position:absolute; left:25%; top:10px; bottom:0; width:1px; background:#fff;"></div>
+            <div style="position:absolute; left:50%; top:10px; bottom:0; width:1px; background:#fff;"></div>
+            <div style="position:absolute; left:75%; top:10px; bottom:0; width:1px; background:#fff;"></div>
+          </div>
+        `;
+        oledBottomLeft.textContent = "KNOB:SIZE";
+        oledBottomRight.textContent = "BTN1:FREEZE";
+      }
+      else if (currentMode === 'AMBIENT') {
+        oledTopRight.textContent = "DRONE";
+        oledCenter.innerHTML = `
+          <svg width="180" height="30" viewBox="0 0 180 30" style="margin:4px 0;">
+            <path d="M0,15 Q30,5 60,15 T120,15 T180,15" fill="none" stroke="#eef2f7" stroke-width="1.5" />
+          </svg>
+          <div style="font-size:10px; letter-spacing:0.05em;">GRAIN POS: 42%</div>
+        `;
+        oledBottomLeft.textContent = "KNOB:COLOR";
+        oledBottomRight.textContent = "BTN2:EXIT";
+      }
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.mode-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.includes(mode));
+      });
+      updateOled();
+    }
+
+    // Button interactions
+    btnPlay.addEventListener('click', () => {
+      btnPlay.classList.add('pressed');
+      setTimeout(() => btnPlay.classList.remove('pressed'), 150);
+      if (currentMode === 'VOL') {
+        isPlaying = !isPlaying;
+      } else if (currentMode === 'TAPE') {
+        isPlaying = !isPlaying;
+      }
+      updateOled();
+    });
+
+    btnNext.addEventListener('click', () => {
+      btnNext.classList.add('pressed');
+      setTimeout(() => btnNext.classList.remove('pressed'), 150);
+      const modes = ['VOL', 'TAPE', 'LOOP', 'AMBIENT'];
+      const nextIdx = (modes.indexOf(currentMode) + 1) % modes.length;
+      setMode(modes[nextIdx]);
+    });
+
+    // Rotary dial drag
+    encoderDial.addEventListener('mousedown', (e) => {
+      isMouseDown = true;
+      lastY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', () => { isMouseDown = false; });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isMouseDown) return;
+      const delta = lastY - e.clientY;
+      lastY = e.clientY;
+      dialAngle += delta * 4;
+      encoderDial.style.transform = `rotate(${dialAngle}deg)`;
+
+      if (currentMode === 'VOL') {
+        volume = Math.max(0, Math.min(85, volume + (delta > 0 ? 1 : -1)));
+      } else if (currentMode === 'LOOP') {
+        const presets = [0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0];
+        let idx = presets.indexOf(loopLength);
+        if (delta > 0 && idx < presets.length - 1) loopLength = presets[idx + 1];
+        if (delta < 0 && idx > 0) loopLength = presets[idx - 1];
+      }
+      updateOled();
+    });
+
+    function copyCmd(btn) {
+      const text = btn.previousElementSibling.textContent;
+      navigator.clipboard.writeText(text);
+      const orig = btn.textContent;
+      btn.textContent = "Kopierad!";
+      setTimeout(() => btn.textContent = orig, 1500);
+    }
+
+    updateOled();
+  </script>
+</body>
+</html>
