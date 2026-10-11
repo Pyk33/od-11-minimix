@@ -188,7 +188,7 @@ def on_rotated():
 
     if current_mode != "VOL" and tape is not None:
         # OB-4 lägen: styr bandspolning, looplängd eller drönarklangfärg
-        tape.on_encoder_rotated(steps / 48.0)
+        tape.on_encoder_rotated(steps)
         touch()
         return
 
@@ -637,8 +637,8 @@ def render_loop_view(d, s, t):
     box_x0, box_y0, box_x1, box_y1 = 14, 30, 114, 46
     d.rectangle([box_x0, box_y0, box_x1, box_y1], outline=255)
 
-    cycle_t = t % max(0.1, loop_sec)
-    frac = cycle_t / max(0.1, loop_sec)
+    # Faslåst playhead: rör sig i perfekt synk med ljudet ur högtalaren!
+    frac = tape.get_loop_progress() if tape else 0.0
     head_x = box_x0 + frac * (box_x1 - box_x0)
     d.line([(head_x, box_y0 + 2), (head_x, box_y1 - 2)], fill=255, width=2)
 
