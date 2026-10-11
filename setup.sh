@@ -14,7 +14,7 @@ RUN_USER="$(whoami)"
 echo "=== 1. Systempaket ==="
 sudo apt update
 sudo apt install -y \
-    python3-venv python3-pip python3-dev swig \
+    python3-venv python3-pip python3-dev python3-numpy swig \
     i2c-tools playerctl avahi-daemon shairport-sync \
     libasound2-dev libjpeg-dev zlib1g-dev libfreetype6-dev \
     fonts-dejavu-core curl ca-certificates \
@@ -33,7 +33,12 @@ fi
 sudo sed -i 's/^dtparam=audio=on/dtparam=audio=off/' "$CFG"
 sudo usermod -aG gpio,i2c,audio "$RUN_USER"
 
-echo "=== 3. ALSA: USB-DAC -> dmix -> softvol('Master') -> default ==="
+echo "=== 3. ALSA: snd-aloop (OB-4 Tape Engine) + USB-DAC softvol ==="
+sudo modprobe snd-aloop 2>/dev/null || true
+if ! grep -q '^snd-aloop' /etc/modules 2>/dev/null; then
+    echo 'snd-aloop' | sudo tee -a /etc/modules >/dev/null
+fi
+
 CARD="${CARD:-$(aplay -l 2>/dev/null | grep -i 'usb' | head -1 | awk '{print $3}')}"
 if [ -z "$CARD" ]; then
     echo "!! Hittade ingen USB-ljudenhet. Anslut Cubilux och kör: CARD=<namn> bash setup.sh"
@@ -42,7 +47,7 @@ if [ -z "$CARD" ]; then
 fi
 echo "Använder ALSA-kort: $CARD"
 sudo tee /etc/asound.conf >/dev/null <<EOF
-# Genererad av setup.sh
+# Genererad av setup.sh – OD-11 Minimix OB-4 Tape Engine
 pcm.dac {
     type hw
     card "$CARD"
@@ -70,17 +75,25 @@ pcm.softvol {
     max_dB 0.0
     resolution 101
 }
+pcm.loop_in {
+    type plug
+    slave {
+        pcm "hw:Loopback,0,0"
+        rate 48000
+        format S16_LE
+    }
+}
 pcm.!default {
     type plug
-    slave.pcm "softvol"
+    slave.pcm "loop_in"
 }
 ctl.!default {
     type hw
     card "$CARD"
 }
 EOF
-# Skapa softvol-kontrollen direkt (annars finns den först efter första uppspelning)
-aplay -q -D default -d 1 -f S16_LE -r 48000 -c 2 /dev/zero 2>/dev/null || true
+# Skapa softvol-kontrollen direkt på det fysiska kortet
+aplay -q -D softvol -d 1 -f S16_LE -r 48000 -c 2 /dev/zero 2>/dev/null || true
 
 echo "=== 4. AirPlay (shairport-sync) ==="
 sudo tee /etc/shairport-sync.conf >/dev/null <<'EOF'

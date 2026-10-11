@@ -11,6 +11,7 @@ Spotify styrs/läses via go-librespot (lokalt REST-API). AirPlay (shairport-sync
 spelar via samma ALSA-kedja; play/next för AirPlay sker best-effort via playerctl.
 """
 import json
+import math
 import os
 import signal
 import subprocess
@@ -29,6 +30,18 @@ try:
     import websocket  # websocket-client, för volymsynk med Spotify-appen
 except ImportError:
     websocket = None
+
+try:
+    import tape_engine
+    tape = tape_engine.TapeEngine(sample_rate=48000, tape_minutes=int(os.environ.get("TAPE_MINUTES", "15")))
+    alsa_bridge = tape_engine.AlsaTapeBridge(
+        tape,
+        capture_device=os.environ.get("TAPE_CAPTURE_DEV", "hw:Loopback,1,0"),
+        playback_device=os.environ.get("TAPE_PLAYBACK_DEV", "pcm.softvol")
+    )
+except Exception as _e:
+    tape = None
+    alsa_bridge = None
 
 # --------------------------------------------------------------------------- #
 # Konfiguration
@@ -95,6 +108,7 @@ state = {
     "overlay_until": 0.0,
     "last_input": time.monotonic(),
     "shutting_down": False,
+    "mode": "VOL",      # "VOL" | "TAPE" | "LOOP" | "AMBIENT"
 }
 stop_event = threading.Event()
 
@@ -168,7 +182,17 @@ def on_rotated():
     encoder.steps = 0
     if steps == 0:
         return
-    # Mjuk acceleration
+
+    with lock:
+        current_mode = state["mode"]
+
+    if current_mode != "VOL" and tape is not None:
+        # OB-4 lägen: styr bandspolning, looplängd eller drönarklangfärg
+        tape.on_encoder_rotated(steps / 48.0)
+        touch()
+        return
+
+    # Mjuk acceleration för volym
     dt = now - _last_rot
     _last_rot = now
     gain = 1.0 if dt > 0.04 else (1.3 if dt > 0.02 else 1.6)
@@ -336,6 +360,83 @@ def do_mute():
     apply_volume()
 
 
+# --- Mode-medvetna knapptryck (OB-4 funktioner) -----------------------------
+def on_btn_play_short():
+    with lock:
+        m = state["mode"]
+    if m == "VOL":
+        do_playpause()
+    elif m == "TAPE":
+        if tape:
+            tape.toggle_tape_stop()
+        touch()
+    elif m == "LOOP":
+        if tape:
+            tape.loop_active = not tape.loop_active
+        touch()
+    elif m == "AMBIENT":
+        if tape:
+            tape.ambient_anchor_pos = tape.head_pos
+        touch()
+
+
+def on_btn_play_long():
+    with lock:
+        m = state["mode"]
+    if m == "VOL":
+        do_mute()
+    elif m == "TAPE":
+        # Hoppa direkt fram till LIVE!
+        if tape:
+            tape.jump_to_live()
+        with lock:
+            state["mode"] = "VOL"
+            touch()
+    elif m == "LOOP":
+        # Växla baklänges loop
+        if tape:
+            tape.loop_reverse = not tape.loop_reverse
+        touch()
+    elif m == "AMBIENT":
+        if tape:
+            tape.set_mode(tape.MODE_VOL)
+        with lock:
+            state["mode"] = "VOL"
+            touch()
+
+
+def on_btn_next_short():
+    with lock:
+        m = state["mode"]
+    if m == "VOL":
+        do_next()
+    else:
+        # Växla mellan OB-4 lägena: TAPE -> LOOP -> AMBIENT -> VOL
+        nxt = tape.cycle_mode() if tape else "VOL"
+        with lock:
+            state["mode"] = nxt
+            touch()
+
+
+def on_btn_next_long():
+    with lock:
+        m = state["mode"]
+    if m == "VOL":
+        # Gå in i OB-4 TAPE mode!
+        if tape:
+            tape.set_mode(tape.MODE_TAPE)
+        with lock:
+            state["mode"] = "TAPE"
+            touch()
+    else:
+        # Återgå till standard VOL
+        if tape:
+            tape.set_mode(tape.MODE_VOL)
+        with lock:
+            state["mode"] = "VOL"
+            touch()
+
+
 combo_active = False   # sant medan båda knapparna hålls ned (enskilda åtgärder ignoreras)
 
 
@@ -472,6 +573,102 @@ def seg_bar(draw, x, y, w, h, frac, segs=24):
             draw.line([(x0, y + h), (x0 + sw - 0.01, y + h)], fill=255)
 
 
+def draw_tape_reel(d, cx, cy, radius, angle):
+    d.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], outline=255)
+    d.ellipse([cx - 2, cy - 2, cx + 2, cy + 2], fill=255)
+    for i in range(3):
+        a = angle + i * (2 * math.pi / 3)
+        x2 = cx + (radius - 1) * math.cos(a)
+        y2 = cy + (radius - 1) * math.sin(a)
+        d.line([(cx, cy), (x2, y2)], fill=255)
+
+
+def render_tape_view(d, s, t):
+    behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
+    speed = tape.speed if tape else 1.0
+
+    d.rectangle([0, 0, 36, 9], fill=255)
+    d.text((2, 0), "TAPE", font=F_XS, fill=0)
+
+    status = "LIVE" if behind_sec < 0.2 else f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
+    d.text((W - text_w(d, status, F_XS) - 2, 0), status, font=F_XS, fill=255)
+    d.line([(0, 10), (W, 10)], fill=255)
+
+    angle_l = t * speed * 4.0
+    angle_r = t * speed * 3.5
+    draw_tape_reel(d, 28, 30, 13, angle_l)
+    draw_tape_reel(d, 100, 30, 13, angle_r)
+
+    d.line([(28, 17), (100, 17)], fill=255)
+    d.line([(28, 43), (100, 43)], fill=255)
+
+    d.rectangle([59, 23, 69, 37], outline=255)
+    d.line([(64, 25), (64, 35)], fill=255)
+
+    if tape and tape.tape_stop_active:
+        sp_str = "STOPPED"
+    elif abs(speed - 1.0) > 0.1:
+        sp_str = f"SPD {speed:+.1f}x"
+    else:
+        sp_str = "PLAYING"
+    d.text((2, 53), sp_str, font=F_XS, fill=255)
+    d.text((W - text_w(d, "KNOB:SCRUB", F_XS) - 2, 53), "KNOB:SCRUB", font=F_XS, fill=255)
+
+
+def render_loop_view(d, s, t):
+    loop_sec = tape.loop_length_s if tape else 2.0
+    is_active = tape.loop_active if tape else True
+
+    d.rectangle([0, 0, 36, 9], fill=255)
+    d.text((2, 0), "LOOP", font=F_XS, fill=0)
+
+    st = "ACTIVE" if is_active else "BYPASS"
+    d.text((W - text_w(d, st, F_XS) - 2, 0), st, font=F_XS, fill=255)
+    d.line([(0, 10), (W, 10)], fill=255)
+
+    sec_str = f"{loop_sec:.2f}s" if loop_sec < 1.0 else f"{loop_sec:.1f}s"
+    if tape and tape.loop_reverse:
+        sec_str += " (REV)"
+    d.text((16, 15), f"LENGTH: {sec_str}", font=F_SM, fill=255)
+
+    box_x0, box_y0, box_x1, box_y1 = 14, 30, 114, 46
+    d.rectangle([box_x0, box_y0, box_x1, box_y1], outline=255)
+
+    cycle_t = t % max(0.1, loop_sec)
+    frac = cycle_t / max(0.1, loop_sec)
+    head_x = box_x0 + frac * (box_x1 - box_x0)
+    d.line([(head_x, box_y0 + 2), (head_x, box_y1 - 2)], fill=255, width=2)
+
+    for seg in range(1, 4):
+        sx = box_x0 + seg * (box_x1 - box_x0) / 4.0
+        d.line([(sx, box_y1 - 4), (sx, box_y1 - 1)], fill=255)
+
+    d.text((2, 53), "KNOB:SIZE", font=F_XS, fill=255)
+    d.text((W - text_w(d, "BTN1:FREEZE", F_XS) - 2, 53), "BTN1:FREEZE", font=F_XS, fill=255)
+
+
+def render_ambient_view(d, s, t):
+    d.rectangle([0, 0, 48, 9], fill=255)
+    d.text((2, 0), "AMBIENT", font=F_XS, fill=0)
+    d.text((W - text_w(d, "DRONE", F_XS) - 2, 0), "DRONE", font=F_XS, fill=255)
+    d.line([(0, 10), (W, 10)], fill=255)
+
+    points = []
+    for x in range(0, W, 2):
+        y = 28 + 7 * math.sin(x * 0.12 + t * 3.0) * math.cos(x * 0.05 - t * 1.5)
+        points.append((x, int(y)))
+    for i in range(len(points) - 1):
+        d.line([points[i], points[i + 1]], fill=255)
+
+    d.line([(14, 46), (114, 46)], fill=255)
+    offset_frac = ((tape.ambient_offset / (SAMPLE_RATE * 5.0)) % 1.0) if tape else 0.5
+    gx = int(14 + offset_frac * 100)
+    d.rectangle([gx - 2, 43, gx + 2, 49], fill=255)
+
+    d.text((2, 53), "GRAIN POS", font=F_XS, fill=255)
+    d.text((W - text_w(d, "BTN2:NEXT", F_XS) - 2, 53), "BTN2:NEXT", font=F_XS, fill=255)
+
+
 def render(t):
     img = Image.new("1", (W, H), 0)
     d = ImageDraw.Draw(img)
@@ -485,6 +682,17 @@ def render(t):
             w = text_w(d, line, F_MD)
             d.text(((W - w) / 2, 14 + i * 18), line, font=F_MD, fill=255)
         return img, False
+
+    # --- OB-4 Speciallägen (TAPE, LOOP, AMBIENT) -----------------------------
+    if s["mode"] == "TAPE":
+        render_tape_view(d, s, t)
+        return img, True
+    elif s["mode"] == "LOOP":
+        render_loop_view(d, s, t)
+        return img, True
+    elif s["mode"] == "AMBIENT":
+        render_ambient_view(d, s, t)
+        return img, True
 
     if now < s["overlay_until"]:
         # --- Volym-overlay: stor siffra + segmentskala -----------------------
@@ -592,9 +800,12 @@ def main():
     encoder = RotaryEncoder(ENC_PIN_A, ENC_PIN_B, max_steps=0, wrap=False)
     encoder.when_rotated = lambda: on_rotated()
     buttons = [
-        LongShortButton(BTN_PLAY_PAUSE, do_playpause, do_mute),
-        LongShortButton(BTN_NEXT, do_next, do_prev),
+        LongShortButton(BTN_PLAY_PAUSE, on_btn_play_short, on_btn_play_long),
+        LongShortButton(BTN_NEXT, on_btn_next_short, on_btn_next_long),
     ]
+
+    if alsa_bridge is not None:
+        alsa_bridge.start()
 
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
@@ -611,6 +822,8 @@ def main():
     try:
         ui_loop(device)
     finally:
+        if alsa_bridge is not None:
+            alsa_bridge.stop()
         _write_state()
         device.clear()
         encoder.close()

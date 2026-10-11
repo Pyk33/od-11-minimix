@@ -4,3 +4,4 @@ gpiozero
 lgpio
 pyalsaaudio
 websocket-client
+numpy
