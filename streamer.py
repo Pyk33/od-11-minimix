@@ -59,7 +59,7 @@ VOL_DEFAULT = int(os.environ.get("VOL_DEFAULT", "25"))
 ENC_STEPS_PER_PERCENT = float(os.environ.get("ENC_STEPS_PER_PERCENT", "48"))
 # LPD3806-600: 48 steg/% => mjuk och precis volymkontroll.
 # Justera efter känsla (högre tal = mjukare, lägre = känsligare).
-LONG_PRESS_S = 0.7
+LONG_PRESS_S = 0.5
 SHUTDOWN_HOLD_S = 3.0             # håll båda knapparna så länge för att stänga av
 SLEEP_AFTER_S = 300               # skärmen släcks efter inaktivitet (ej vid uppspelning)
 OVERLAY_S = 1.6
@@ -393,12 +393,10 @@ def on_btn_play_long():
         else:
             do_mute()
     elif m == "TAPE":
-        # Hoppa direkt fram till LIVE!
+        # Hoppa direkt fram till LIVE på bandet!
         if tape:
             tape.jump_to_live()
-        with lock:
-            state["mode"] = "VOL"
-            touch()
+        touch()
     elif m == "LOOP":
         # Växla baklänges loop
         if tape:
@@ -624,7 +622,8 @@ def render_tape_view(d, s, t):
     else:
         sp_str = "PLAYING"
     d.text((2, 53), sp_str, font=F_XS, fill=255)
-    d.text((W - text_w(d, "KNOB:SCRATCH", F_XS) - 2, 53), "KNOB:SCRATCH", font=F_XS, fill=255)
+    hint = "HOLD 1:LIVE" if behind_sec > 1.0 else "KNOB:SCRATCH"
+    d.text((W - text_w(d, hint, F_XS) - 2, 53), hint, font=F_XS, fill=255)
 
 
 def render_loop_view(d, s, t):

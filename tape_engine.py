@@ -194,12 +194,12 @@ class TapeEngine:
     def jump_to_live(self):
         """Hoppar explicit fram till realtidssändningen (LIVE)."""
         with self._lock:
-            self.mode = self.MODE_VOL
-            self.tape_stop_active = False
+            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+            self.head_pos = live_edge
+            self.target_head_pos = live_edge
             self.speed = 1.0
             self.vinyl_state = "PLAY"
-            self.head_pos = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
-            self.target_head_pos = self.head_pos
+            self.tape_stop_active = False
 
     def toggle_tape_stop(self):
         """Växlar skivspelarmotorns strömbrytare (autentisk retardation/start)."""
@@ -213,20 +213,34 @@ class TapeEngine:
         with self._lock:
             now = time.monotonic()
             if self.mode == self.MODE_TAPE:
-                # 1:1 Vinyl Slipmat Scratch Model
+                live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+                max_history = max(0, min(self.tape.total_recorded - self.live_latency_frames * 2,
+                                         self.tape.max_frames - self.live_latency_frames * 2))
+
                 if self.vinyl_state != "SCRATCH":
                     self.vinyl_state = "SCRATCH"
                     self.target_head_pos = self.head_pos
                     self.tape_stop_active = False
 
-                # Flytta vinylskivan direkt med handens vridning (42 samples per steg)
-                self.target_head_pos = (self.target_head_pos + steps * SAMPLES_PER_STEP) % self.tape.max_frames
+                current_behind = (live_edge - self.target_head_pos) % self.tape.max_frames
+                delta = steps * SAMPLES_PER_STEP
 
-                # Spärra så man inte kan skrapa in i framtiden bortom live-bandet
-                live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
-                behind = (self.tape.write_pos - self.target_head_pos) % self.tape.max_frames
-                if behind < self.live_latency_frames or behind > self.tape.max_frames - self.live_latency_frames * 2:
-                    self.target_head_pos = live_edge
+                if steps > 0:
+                    # Spolar / scratchar framåt mot LIVE
+                    if delta >= current_behind:
+                        # Har nått eller passerat nutid -> spärra bergfast vid LIVE!
+                        self.target_head_pos = live_edge
+                    else:
+                        self.target_head_pos = (self.target_head_pos + delta) % self.tape.max_frames
+                elif steps < 0:
+                    # Scratchar bakåt i musikhistorien
+                    back_dist = abs(delta)
+                    remaining = max(0, max_history - current_behind)
+                    if back_dist >= remaining:
+                        # Har nått början på tillgänglig bandbuffert
+                        self.target_head_pos = (live_edge - max_history) % self.tape.max_frames
+                    else:
+                        self.target_head_pos = (self.target_head_pos + delta) % self.tape.max_frames
 
                 self.last_touch_time = now
 
@@ -268,8 +282,11 @@ class TapeEngine:
     def get_time_behind_live_sec(self) -> float:
         """Sekunder efter realtidsströmmen (fungerar i alla lägen)."""
         with self._lock:
-            behind = (self.tape.write_pos - self.head_pos) % self.tape.max_frames
-            return max(0.0, (behind - self.live_latency_frames) / self.sr)
+            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+            behind = (live_edge - self.head_pos) % self.tape.max_frames
+            if behind > self.tape.max_frames / 2:
+                return 0.0
+            return max(0.0, behind / self.sr)
 
     # ----------------------------------------------------------------------- #
     # DSP Process Block (körs kontinuerligt för varje ljudblock)
@@ -289,14 +306,12 @@ class TapeEngine:
 
             # --- MODE_VOL: Normal sömlös uppspelning från aktuell nålposition ---
             if self.mode == self.MODE_VOL:
-                pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
-                self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
-
-                # Om vi kommit ikapp realtidsströmmen, lås mjukt mot live
-                behind = (self.tape.write_pos - self.head_pos) % self.tape.max_frames
-                if behind < self.live_latency_frames or behind > self.tape.max_frames - self.live_latency_frames * 2:
+                behind_head = (live_edge - self.head_pos) % self.tape.max_frames
+                if frames_needed >= behind_head:
                     self.head_pos = live_edge
-
+                else:
+                    self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+                pos = (self.head_pos - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
                 return self.tape.read_interp(pos)
 
             # --- MODE_TAPE: 1:1 Vinyl Scratch & Skivspelarmotorfysik ---
@@ -317,24 +332,28 @@ class TapeEngine:
                     self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
                     return self.tape.read_interp(pos)
 
+                behind_head = (live_edge - self.head_pos) % self.tape.max_frames
+
                 if self.vinyl_state == "SCRATCH":
                     # Handen styr skivan direkt på slipmaten
-                    diff = (self.target_head_pos - self.head_pos)
-                    if diff > self.tape.max_frames / 2:
-                        diff -= self.tape.max_frames
-                    elif diff < -self.tape.max_frames / 2:
-                        diff += self.tape.max_frames
+                    behind_target = (live_edge - self.target_head_pos) % self.tape.max_frames
+                    diff = behind_head - behind_target
 
                     demanded_speed = diff / frames_needed
                     demanded_speed = max(-5.0, min(4.5, demanded_speed))
-
                     self.speed += (demanded_speed - self.speed) * 0.70
+
                     if abs(self.speed) < 0.02 and abs(diff) < 10:
                         self.speed = 0.0
                         return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
 
                     pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
-                    self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
+                    step_frames = frames_needed * self.speed
+                    if step_frames > 0 and step_frames >= behind_head:
+                        self.head_pos = live_edge
+                        self.speed = 1.0
+                    else:
+                        self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
 
                 elif self.vinyl_state == "RELEASE":
                     # Skivtallrikens friktion bromsar backrotation och accelererar mjukt till 1.0x framåt
@@ -354,19 +373,21 @@ class TapeEngine:
                             self.vinyl_state = "PLAY"
 
                     pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
-                    self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
+                    step_frames = frames_needed * self.speed
+                    if step_frames > 0 and step_frames >= behind_head:
+                        self.head_pos = live_edge
+                        self.speed = 1.0
+                        self.vinyl_state = "PLAY"
+                    else:
+                        self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
 
                 else: # "PLAY"
                     self.speed = 1.0
                     pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
-                    self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
-
-                # Spärra mot framtiden
-                behind = (self.tape.write_pos - self.head_pos) % self.tape.max_frames
-                if behind < self.live_latency_frames or behind > self.tape.max_frames - self.live_latency_frames * 2:
-                    self.head_pos = live_edge
-                    if self.speed > 1.0:
-                        self.speed = 1.0
+                    if frames_needed >= behind_head:
+                        self.head_pos = live_edge
+                    else:
+                        self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
 
                 return self.tape.read_interp(pos)
 
