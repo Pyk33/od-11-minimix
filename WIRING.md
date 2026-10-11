@@ -88,16 +88,25 @@ Test innan du kopplar in Pi:n på riktigt: mata encodern med 5 V och mät A och 
 
 Går volymen åt fel håll: byt plats på A och B.
 
-## 3. Tryckknappar (12 mm, förkopplade)
+## 3. Tryckknappar (12 mm metallknappar med NO, C, NC)
 
-Knapparna har redan sladdar. Varje knapp har typiskt tre trådar: **COM**, **NO** och **NC**. Hitta dem med multimeter i läge ljud/kontinuitet. NO och COM ska bara ha kontakt medan du trycker. Låt NC vara.
+Använd bara stiften märkta **NO** och **C**. Låt **NC** vara okopplad.
 
-| Knapp | COM | NO |
-|---|---|---|
-| Play/Pause | GND (pin 20) | GPIO22 (pin 15) |
-| Next | GND (pin 20) | GPIO23 (pin 16) |
+| Knapp | C (Common) | NO (Normally Open) | HAT-plintar (Rad 3) |
+|---|---|---|---|
+| **Play/Pause** | GND | GPIO22 | **`GND`** + **`IO22`** |
+| **Next** | GND | GPIO23 | **`GND`** + **`IO23`** |
 
-Inga motstånd behövs. Koden aktiverar interna pull-ups.
+Inga externa motstånd behövs. Koden aktiverar interna pull-ups automatiskt.
+
+### Knappfunktioner i koden:
+- **Play/Pause (IO22):** 
+  - Klick: Växla Play / Pause.
+  - Håll intryckt (0,7 s): Mute / Unmute.
+- **Next (IO23):** 
+  - Klick: Nästa låt.
+  - Håll intryckt (0,7 s): Föregående låt.
+- **Säker avstängning:** Håll **båda knapparna samtidigt i 3 sekunder**. Skärmen visar *"STÄNGER AV..."* och Pi:n stängs ner kontrollerat.
 
 ## 4. Ljud
 
