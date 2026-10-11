@@ -22,6 +22,7 @@ SAMPLE_RATE = 48000
 CHANNELS = 2
 BLOCK_SIZE = 1024                    # ~21.3 ms per block vid 48 kHz
 DEFAULT_TAPE_MINUTES = 15            # ~172 MB int16 stereo RAM
+SAMPLES_PER_STEP = 42                # ~2.1 sekunder per helt varv (2400 steg) – 1:1 vinyl slipmat
 
 # --------------------------------------------------------------------------- #
 # Cirkulär bandbuffert
@@ -93,10 +94,12 @@ class CircularTapeBuffer:
 # --------------------------------------------------------------------------- #
 # Huvudmotor: TapeEngine
 # --------------------------------------------------------------------------- #
+# Huvudmotor: TapeEngine (1:1 Vinyl Slipmat & Seamless Audio Continuity)
+# --------------------------------------------------------------------------- #
 class TapeEngine:
-    MODE_VOL = "VOL"          # Standard: Encodern styr volym
-    MODE_TAPE = "TAPE"        # OB-4 Band: Scrubbing / Spolning
-    MODE_LOOP = "LOOP"        # Instant Looper: Upprepning / Stutter
+    MODE_VOL = "VOL"          # Standard: Encodern styr volym, sömlös uppspelning från nålen
+    MODE_TAPE = "TAPE"        # OB-4 Vinyl / Band: 1:1 slipmat scratch & spolning
+    MODE_LOOP = "LOOP"        # Instant Looper: Upprepning / Stutter utan tidshopp
     MODE_AMBIENT = "AMBIENT"  # Disk Mode: Eterisk drönarsyntes
 
     LOOP_PRESETS = [0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]
@@ -106,17 +109,18 @@ class TapeEngine:
         self.tape = CircularTapeBuffer(sample_rate, max_minutes=tape_minutes)
         self.mode = self.MODE_VOL
 
-        # Playhead & Vari-speed
+        # Nålposition och live-buffert
         self.head_pos = 0.0
         self.live_latency_frames = int(0.04 * sample_rate)  # 40 ms live-fördröjning
-        self.speed = 1.0
-        self.target_speed = 1.0
-        self.inertia = 0.22                                # mekanisk tröghet i bandet
-        self.tape_stop_active = False
+        self.initialized_head = False
 
-        # Scrubbing state
-        self._last_scrub_time = time.monotonic()
-        self.is_scrubbing = False
+        # Vinyl Scratch Engine (Slipmat-fysik inspirerad av Serato / OB-4)
+        self.vinyl_state = "PLAY"       # "PLAY", "SCRATCH", "RELEASE"
+        self.target_head_pos = 0.0
+        self.speed = 1.0
+        self.last_touch_time = 0.0
+        self.release_timeout = 0.075    # 75 ms utan pulser = handen har släppt skivan
+        self.tape_stop_active = False
 
         # Instant Looper state
         self.loop_active = False
@@ -150,26 +154,30 @@ class TapeEngine:
             self.mode = new_mode
 
             if new_mode == self.MODE_VOL:
+                # Återgång till VOL: Hoppa ALDRIG framåt till live!
+                # Fortsätt spela sömlöst från exakt där nålen befinner sig.
                 self.speed = 1.0
-                self.target_speed = 1.0
+                self.vinyl_state = "PLAY"
                 self.tape_stop_active = False
+
             elif new_mode == self.MODE_TAPE:
-                if old_mode == self.MODE_VOL:
-                    self.head_pos = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
-                self.target_speed = 1.0
+                # Gå in i TAPE: behåll nålen exakt på låten där den spelar
+                self.vinyl_state = "PLAY"
                 self.speed = 1.0
-                self.is_scrubbing = False
+                self.target_head_pos = self.head_pos
                 self.tape_stop_active = False
+
             elif new_mode == self.MODE_LOOP:
-                # Fånga omedelbart slinga från nuvarande uppspelningsposition
+                # Fånga slinga från nuvarande uppspelningsposition
                 frames = int(self.loop_length_s * self.sr)
                 self.loop_end_pos = self.head_pos
                 self.loop_start_pos = (self.loop_end_pos - frames) % self.tape.max_frames
                 self.loop_active = True
                 self.tape_stop_active = False
                 self._loop_accum = 0
+
             elif new_mode == self.MODE_AMBIENT:
-                # Förankra ambient drönarfönster vid nuvarande ljud
+                # Förankra ambient drönarfönster vid nuvarande nål
                 self.ambient_anchor_pos = self.head_pos
                 self.ambient_offset = 0.0
                 self.tape_stop_active = False
@@ -184,38 +192,43 @@ class TapeEngine:
         return nxt
 
     def jump_to_live(self):
-        """Hoppar omedelbart fram till livesändningen."""
+        """Hoppar explicit fram till realtidssändningen (LIVE)."""
         with self._lock:
             self.mode = self.MODE_VOL
             self.tape_stop_active = False
             self.speed = 1.0
-            self.target_speed = 1.0
+            self.vinyl_state = "PLAY"
             self.head_pos = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+            self.target_head_pos = self.head_pos
 
     def toggle_tape_stop(self):
-        """Växlar autentisk motorstopp/retardation."""
+        """Växlar skivspelarmotorns strömbrytare (autentisk retardation/start)."""
         with self._lock:
             self.tape_stop_active = not self.tape_stop_active
 
     def on_encoder_rotated(self, steps: int):
         """
-        Anropas med råa encoderticks (positiv = medurs, negativ = moturs).
+        Anropas med råa encoderticks (positiv = medurs/framåt, negativ = moturs/bakåt).
         """
         with self._lock:
             now = time.monotonic()
             if self.mode == self.MODE_TAPE:
-                dt = max(0.005, now - self._last_scrub_time)
-                self._last_scrub_time = now
+                # 1:1 Vinyl Slipmat Scratch Model
+                if self.vinyl_state != "SCRATCH":
+                    self.vinyl_state = "SCRATCH"
+                    self.target_head_pos = self.head_pos
+                    self.tape_stop_active = False
 
-                # 2400 steg/varv -> 60 samples per steg = 3 sekunder per varv
-                samples_per_step = 60
-                scrub_velocity_samples_sec = (steps * samples_per_step) / dt
-                raw_speed = scrub_velocity_samples_sec / self.sr
+                # Flytta vinylskivan direkt med handens vridning (42 samples per steg)
+                self.target_head_pos = (self.target_head_pos + steps * SAMPLES_PER_STEP) % self.tape.max_frames
 
-                # Fysisk hastighetsbegränsning: -4.0x (snabb rewind) till +3.0x
-                self.target_speed = max(-4.0, min(3.0, raw_speed))
-                self.is_scrubbing = True
-                self.tape_stop_active = False
+                # Spärra så man inte kan skrapa in i framtiden bortom live-bandet
+                live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+                behind = (self.tape.write_pos - self.target_head_pos) % self.tape.max_frames
+                if behind < self.live_latency_frames or behind > self.tape.max_frames - self.live_latency_frames * 2:
+                    self.target_head_pos = live_edge
+
+                self.last_touch_time = now
 
             elif self.mode == self.MODE_LOOP:
                 # Kalibrerad känslighet: 48 steg (ett distinkt taktilt hack) per förval
@@ -244,7 +257,7 @@ class TapeEngine:
     def get_loop_progress(self) -> float:
         """Exakt fasindikator (0.0 till 1.0) för synkad skärmanimering."""
         with self._lock:
-            if self.mode != self.MODE_LOOP:
+            if self.mode != self.MODE_LOOP or not self.loop_active:
                 return 0.0
             loop_len = int(self.loop_length_s * self.sr)
             if loop_len <= 0:
@@ -253,12 +266,10 @@ class TapeEngine:
             return float(np.clip(rel / loop_len, 0.0, 1.0))
 
     def get_time_behind_live_sec(self) -> float:
-        """Sekunder efter realtidsströmmen."""
+        """Sekunder efter realtidsströmmen (fungerar i alla lägen)."""
         with self._lock:
-            if self.mode == self.MODE_VOL:
-                return 0.0
             behind = (self.tape.write_pos - self.head_pos) % self.tape.max_frames
-            return max(0.0, behind / self.sr)
+            return max(0.0, (behind - self.live_latency_frames) / self.sr)
 
     # ----------------------------------------------------------------------- #
     # DSP Process Block (körs kontinuerligt för varje ljudblock)
@@ -268,45 +279,108 @@ class TapeEngine:
             if self.tape.total_recorded < self.live_latency_frames:
                 return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
 
-            now = time.monotonic()
+            if not self.initialized_head:
+                self.head_pos = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+                self.target_head_pos = self.head_pos
+                self.initialized_head = True
 
+            now = time.monotonic()
+            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+
+            # --- MODE_VOL: Normal sömlös uppspelning från aktuell nålposition ---
             if self.mode == self.MODE_VOL:
-                # Direkt passthrough från live-bandhuvudet
-                live_target = (self.tape.write_pos - self.live_latency_frames - frames_needed) % self.tape.max_frames
-                self.head_pos = live_target
                 pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
                 self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
-                return self.tape.read_interp(pos)
 
-            elif self.mode == self.MODE_TAPE:
-                # Om användaren slutade vrida för > 100 ms: glid mjukt tillbaka till 1.0x uppspelning
-                if self.is_scrubbing and (now - self._last_scrub_time > 0.10):
-                    if not self.tape_stop_active:
-                        self.target_speed = 1.0
-                    self.is_scrubbing = False
-
-                if self.tape_stop_active:
-                    self.target_speed = 0.0
-
-                # Mjuk retardation och tröghetsfilter
-                self.speed += (self.target_speed - self.speed) * self.inertia
-                if abs(self.speed) < 0.02 and self.tape_stop_active:
-                    return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
-
-                pos = self.head_pos + np.arange(frames_needed) * self.speed
-                self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
-
-                # Har vi hunnit ifatt realtidsströmmen?
+                # Om vi kommit ikapp realtidsströmmen, lås mjukt mot live
                 behind = (self.tape.write_pos - self.head_pos) % self.tape.max_frames
-                if behind < self.live_latency_frames and self.speed >= 0:
-                    self.head_pos = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
-                    self.speed = 1.0
-                    self.target_speed = 1.0
+                if behind < self.live_latency_frames or behind > self.tape.max_frames - self.live_latency_frames * 2:
+                    self.head_pos = live_edge
 
                 return self.tape.read_interp(pos)
 
+            # --- MODE_TAPE: 1:1 Vinyl Scratch & Skivspelarmotorfysik ---
+            elif self.mode == self.MODE_TAPE:
+                # Har användaren släppt skivan med handen?
+                if self.vinyl_state == "SCRATCH" and (now - self.last_touch_time > self.release_timeout):
+                    self.vinyl_state = "RELEASE"
+                    if self.tape_stop_active:
+                        self.speed = 0.0
+
+                # Tape Stop (avstängd motor med realistisk retardation)
+                if self.tape_stop_active:
+                    self.speed += (0.0 - self.speed) * 0.12
+                    if abs(self.speed) < 0.01:
+                        self.speed = 0.0
+                        return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
+                    pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
+                    return self.tape.read_interp(pos)
+
+                if self.vinyl_state == "SCRATCH":
+                    # Handen styr skivan direkt på slipmaten
+                    diff = (self.target_head_pos - self.head_pos)
+                    if diff > self.tape.max_frames / 2:
+                        diff -= self.tape.max_frames
+                    elif diff < -self.tape.max_frames / 2:
+                        diff += self.tape.max_frames
+
+                    demanded_speed = diff / frames_needed
+                    demanded_speed = max(-5.0, min(4.5, demanded_speed))
+
+                    self.speed += (demanded_speed - self.speed) * 0.70
+                    if abs(self.speed) < 0.02 and abs(diff) < 10:
+                        self.speed = 0.0
+                        return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
+
+                    pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
+
+                elif self.vinyl_state == "RELEASE":
+                    # Skivtallrikens friktion bromsar backrotation och accelererar mjukt till 1.0x framåt
+                    if self.speed < 0:
+                        self.speed += (0.0 - self.speed) * 0.65
+                        if abs(self.speed) < 0.04:
+                            self.speed = 0.0
+                    elif self.speed > 1.0:
+                        self.speed += (1.0 - self.speed) * 0.45
+                        if abs(self.speed - 1.0) < 0.04:
+                            self.speed = 1.0
+                            self.vinyl_state = "PLAY"
+                    else:
+                        self.speed += (1.0 - self.speed) * 0.30
+                        if abs(self.speed - 1.0) < 0.04:
+                            self.speed = 1.0
+                            self.vinyl_state = "PLAY"
+
+                    pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
+
+                else: # "PLAY"
+                    self.speed = 1.0
+                    pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+
+                # Spärra mot framtiden
+                behind = (self.tape.write_pos - self.head_pos) % self.tape.max_frames
+                if behind < self.live_latency_frames or behind > self.tape.max_frames - self.live_latency_frames * 2:
+                    self.head_pos = live_edge
+                    if self.speed > 1.0:
+                        self.speed = 1.0
+
+                return self.tape.read_interp(pos)
+
+            # --- MODE_LOOP: Instant looper med sömlös bypass ---
             elif self.mode == self.MODE_LOOP:
-                # Instant Loop med klickfri wrap och faslåst uppspelning
+                if not self.loop_active:
+                    # Loop avstängd (bypass): spela rakt igenom låten från aktuell punkt!
+                    pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+                    behind = (self.tape.write_pos - self.head_pos) % self.tape.max_frames
+                    if behind < self.live_latency_frames or behind > self.tape.max_frames - self.live_latency_frames * 2:
+                        self.head_pos = live_edge
+                    return self.tape.read_interp(pos)
+
                 loop_len = int(self.loop_length_s * self.sr)
                 if loop_len < 256:
                     loop_len = 256
@@ -316,7 +390,7 @@ class TapeEngine:
                 self.head_pos = (self.loop_start_pos + (rel + frames_needed) % loop_len) % self.tape.max_frames
                 out = self.tape.read_interp(pos)
 
-                # Mjuk equal-power crossfade vid loop-skarven
+                # Mjuk crossfade vid loop-skarven
                 wrap_idx = int(loop_len - rel)
                 if 0 <= wrap_idx < frames_needed:
                     fade_len = min(256, frames_needed - wrap_idx)
@@ -326,8 +400,8 @@ class TapeEngine:
 
                 return out
 
+            # --- MODE_AMBIENT: OB-4 Disk Ambient ---
             elif self.mode == self.MODE_AMBIENT:
-                # 4-stämmig Hann-fönstrad granulsyntes (OB-4 Disk Ambient)
                 grain_len = self.ambient_grain_size
                 out = np.zeros((frames_needed, CHANNELS), dtype=np.float32)
                 center = (self.ambient_anchor_pos + self.ambient_offset) % self.tape.max_frames

@@ -384,7 +384,14 @@ def on_btn_play_long():
     with lock:
         m = state["mode"]
     if m == "VOL":
-        do_mute()
+        # Om vi lyssnar på fördröjt band: hoppa direkt fram till LIVE! Annars Mute.
+        behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
+        if behind_sec > 1.5:
+            if tape:
+                tape.jump_to_live()
+            touch()
+        else:
+            do_mute()
     elif m == "TAPE":
         # Hoppa direkt fram till LIVE!
         if tape:
@@ -610,12 +617,14 @@ def render_tape_view(d, s, t):
 
     if tape and tape.tape_stop_active:
         sp_str = "STOPPED"
+    elif tape and getattr(tape, "vinyl_state", "") == "SCRATCH":
+        sp_str = f"SCRATCH {speed:+.1f}x"
     elif abs(speed - 1.0) > 0.1:
         sp_str = f"SPD {speed:+.1f}x"
     else:
         sp_str = "PLAYING"
     d.text((2, 53), sp_str, font=F_XS, fill=255)
-    d.text((W - text_w(d, "KNOB:SCRUB", F_XS) - 2, 53), "KNOB:SCRUB", font=F_XS, fill=255)
+    d.text((W - text_w(d, "KNOB:SCRATCH", F_XS) - 2, 53), "KNOB:SCRATCH", font=F_XS, fill=255)
 
 
 def render_loop_view(d, s, t):
@@ -710,9 +719,13 @@ def render(t):
     # --- Topprad ----------------------------------------------------------------
     src = s["source"] or "OD-11"
     d.text((2, 0), src, font=F_XS, fill=255)
-    stat = "PLAY" if s["playing"] and s["source"] else ("PAUSE" if s["source"] else "READY")
+    behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
+    if behind_sec > 1.5:
+        stat = f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
+    else:
+        stat = "PLAY" if s["playing"] and s["source"] else ("PAUSE" if s["source"] else "READY")
     d.text((W - 2 - text_w(d, stat, F_XS), 0), stat, font=F_XS, fill=255)
-    if s["playing"] and s["source"]:
+    if s["playing"] and s["source"] and behind_sec <= 1.5:
         d.rectangle([W - 2 - text_w(d, stat, F_XS) - 7, 3, W - 2 - text_w(d, stat, F_XS) - 4, 6], fill=255)
     d.line([(0, 11), (W, 11)], fill=255)
 
