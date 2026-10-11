@@ -474,7 +474,10 @@ def combo_watcher(buttons):
     global combo_active
     since = None
     while not stop_event.is_set():
-        pressed = [b.btn.is_pressed for b in buttons]
+        try:
+            pressed = [b.btn.is_pressed for b in buttons]
+        except Exception:
+            break
         if all(pressed):
             combo_active = True
             if since is None:
@@ -661,7 +664,7 @@ def render_ambient_view(d, s, t):
         d.line([points[i], points[i + 1]], fill=255)
 
     d.line([(14, 46), (114, 46)], fill=255)
-    offset_frac = ((tape.ambient_offset / (SAMPLE_RATE * 5.0)) % 1.0) if tape else 0.5
+    offset_frac = ((tape.ambient_offset / (tape.sr * 5.0)) % 1.0) if tape else 0.5
     gx = int(14 + offset_frac * 100)
     d.rectangle([gx - 2, 43, gx + 2, 49], fill=255)
 
