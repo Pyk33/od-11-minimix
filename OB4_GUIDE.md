@@ -39,10 +39,10 @@ En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz s
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
-| **Rotary Encoder** | Vrid moturs | **Scratcha bakåt i musikhistorien!** (Autentisk vinyl/band-retardation). |
-| | Vrid medurs | **Spola framåt mot LIVE:** Snabb vridning accelererar spolningen så du når LIVE t-0 med ett snabbt knyck. Spärras bergfast vid LIVE (t-0) utan att hoppa förbi. |
-| **Play/Pause (`IO22`)** | Klick | **1-KLICK JUMP TO LIVE (t-0):** Om du ligger bakom nutid hoppar du omedelbart fram till realtidsströmmen! Om du redan är vid LIVE pausas/startas motorn (Tape Stop). |
-| | Håll (>0.5 s) | **JUMP TO LIVE!** Hoppar omedelbart fram till realtidsströmmen. |
+| **Rotary Encoder** | Vrid moturs | **Scratcha bakåt i musikhistorien!** (1:1 autentisk vinylkänsla). |
+| | Vrid medurs | **Super Spool framåt mot LIVE:** Snabb vridning accelererar spolningen exponentiellt (upp till 30x) så du sveper 30–60 sekunder på nolltid. Spärras och fastnar bergfast vid LIVE (t-0). |
+| **Play/Pause (`IO22`)** | Klick | **1-KLICK DJ MERGE TO LIVE!** Om du ligger bakom nutid görs en mjuk equal-power DJ-crossfade som stilrent mixar bandet in i realtidsströmmen! Vid LIVE: Tape Stop motorbroms. |
+| | Håll (>0.5 s) | **Direkt snitt till LIVE:** Omedelbart klipp fram till realtidsströmmen utan fade. |
 | **Next (`IO23`)** | Klick | Växla till **`LOOP` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Låten fortsätter spela sömlöst framåt från exakt den punkt nålen befinner sig på! |
 

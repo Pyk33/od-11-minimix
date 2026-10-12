@@ -370,7 +370,7 @@ def on_btn_play_short():
         if tape:
             behind_sec = tape.get_time_behind_live_sec()
             if behind_sec > 0.08:
-                tape.jump_to_live()
+                tape.jump_to_live(dj_merge=True)
             else:
                 tape.toggle_tape_stop()
         touch()
@@ -387,13 +387,13 @@ def on_btn_play_long():
         behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
         if behind_sec > 1.0:
             if tape:
-                tape.jump_to_live()
+                tape.jump_to_live(dj_merge=True)
             touch()
         else:
             do_mute()
     elif m == "TAPE":
         if tape:
-            tape.jump_to_live()
+            tape.jump_to_live(dj_merge=False) # Långtryck = direkt klipp till LIVE utan fade
         touch()
     elif m == "LOOP":
         if tape:
@@ -585,11 +585,17 @@ def draw_tape_reel(d, cx, cy, radius, angle):
 def render_tape_view(d, s, t):
     behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
     speed = tape.speed if tape else 1.0
+    is_merging = getattr(tape, "is_dj_merging", False) if tape else False
 
     d.rectangle([0, 0, 36, 9], fill=255)
     d.text((2, 0), "TAPE", font=F_XS, fill=0)
 
-    status = "LIVE" if behind_sec < 0.08 else f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
+    if is_merging:
+        status = "MERGING"
+    elif behind_sec < 0.08:
+        status = "LIVE"
+    else:
+        status = f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
     d.text((W - text_w(d, status, F_XS) - 2, 0), status, font=F_XS, fill=255)
     d.line([(0, 10), (W, 10)], fill=255)
 
@@ -604,7 +610,9 @@ def render_tape_view(d, s, t):
     d.rectangle([59, 23, 69, 37], outline=255)
     d.line([(64, 25), (64, 35)], fill=255)
 
-    if tape and tape.tape_stop_active:
+    if is_merging:
+        sp_str = "DJ MERGE..."
+    elif tape and tape.tape_stop_active:
         sp_str = "STOPPED"
     elif behind_sec < 0.08:
         sp_str = "LIVE (t-0)"
@@ -613,7 +621,7 @@ def render_tape_view(d, s, t):
     else:
         sp_str = "PLAYING"
     d.text((2, 53), sp_str, font=F_XS, fill=255)
-    hint = "BTN1:LIVE" if behind_sec > 0.08 else "BTN2:LOOP"
+    hint = "BTN1:LIVE" if (behind_sec > 0.08 and not is_merging) else "BTN2:LOOP"
     d.text((W - text_w(d, hint, F_XS) - 2, 53), hint, font=F_XS, fill=255)
 
 

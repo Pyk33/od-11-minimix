@@ -4,10 +4,11 @@ tape_engine.py – Teenage Engineering OB-4 Magic Tape & Loop DSP Engine.
 
 Funktioner inspirerade av Teenage Engineering OB-4:
   1. Kontinuerlig rullande bandbuffert (10–30 min i RAM).
-  2. Vari-speed tape resampler (1:1 vinyl slipmat känsla, mjuk acceleration framåt till LIVE t-0).
-  3. Instant looper (framåtriktad tidsförlängning & glidande tidsfönster längs låten).
-  4. Sömlös uppspelningskontinuitet (musiken fortsätter alltid från aktuell punkt utan hopp).
-  5. Tape Stop (simulerar skivspelare/bandavstängning med realistisk retardation).
+  2. Vari-speed tape resampler (1:1 vinyl slipmat känsla, Super Spool acceleration & bergfast LIVE t-0).
+  3. DJ Merge to LIVE: silkeslen equal-power crossfade vid återgång till realtidsmusiken.
+  4. Instant looper (framåtriktad tidsförlängning & glidande tidsfönster längs låten).
+  5. Sömlös uppspelningskontinuitet (musiken fortsätter alltid från aktuell punkt utan hopp).
+  6. Tape Stop (simulerar skivspelare/bandavstängning med realistisk retardation).
 """
 import math
 import threading
@@ -96,7 +97,7 @@ class CircularTapeBuffer:
 # --------------------------------------------------------------------------- #
 class TapeEngine:
     MODE_VOL = "VOL"          # Standard: Encodern styr volym, sömlös uppspelning från nålen
-    MODE_TAPE = "TAPE"        # OB-4 Vinyl: 1:1 slipmat scratch, spolning & snabb framåt till LIVE
+    MODE_TAPE = "TAPE"        # OB-4 Vinyl: 1:1 slipmat scratch, Super Spool & LIVE (t-0)
     MODE_LOOP = "LOOP"        # Instant Looper: Framåt expansion & glidande tidsfönster
 
     LOOP_PRESETS = [0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]
@@ -112,12 +113,21 @@ class TapeEngine:
         self.initialized_head = False
         self.is_live = True
 
-        # Vinyl Scratch Engine
+        # Vinyl Scratch Engine & Super Spool
         self._pending_tape_steps = 0
         self.speed = 1.0
         self.last_touch_time = 0.0
         self.release_timeout = 0.080    # 80 ms utan pulser = handen har släppt skivan
         self.tape_stop_active = False
+
+        # Dynamisk hastighetsmätning över pulsskurar
+        self._last_rot_time = 0.0
+        self._velocity_est = 0.0        # steg per sekund
+
+        # DJ Merge to LIVE (mjuk equal-power crossfade vid återgång till nutid)
+        self.is_dj_merging = False
+        self.merge_fade_frames = int(0.85 * sample_rate)  # 850 ms DJ crossfade
+        self.merge_fade_pos = 0
 
         # Instant Looper state
         self.loop_active = False
@@ -173,15 +183,29 @@ class TapeEngine:
             self.loop_edit_mode = "MOVE" if self.loop_edit_mode == "SIZE" else "SIZE"
             return self.loop_edit_mode
 
-    def jump_to_live(self):
-        """Hoppar bergfast och omedelbart fram till realtidssändningen (LIVE t-0)."""
+    def jump_to_live(self, dj_merge: bool = True):
+        """Hoppar till LIVE. Om dj_merge=True sker en mjuk equal-power DJ-övergång."""
         with self._lock:
+            if self.is_live and not self.is_dj_merging:
+                return
+
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
-            self.head_pos = live_edge
-            self.is_live = True
-            self.speed = 1.0
-            self._pending_tape_steps = 0
-            self.tape_stop_active = False
+            behind = (live_edge - self.head_pos) % self.tape.max_frames
+            behind_sec = behind / self.sr if behind < self.tape.max_frames / 2 else 0.0
+
+            if not dj_merge or behind_sec < 0.25:
+                # Omedelbart snitt om vi redan är extremt nära nutid
+                self.head_pos = live_edge
+                self.is_live = True
+                self.is_dj_merging = False
+                self.speed = 1.0
+                self._pending_tape_steps = 0
+                self.tape_stop_active = False
+            else:
+                # Mjuk DJ Merge Crossfade!
+                self.is_dj_merging = True
+                self.merge_fade_pos = 0
+                self.tape_stop_active = False
 
     def toggle_tape_stop(self):
         """Växlar skivspelarmotorns strömbrytare (autentisk retardation/start)."""
@@ -197,6 +221,16 @@ class TapeEngine:
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
 
             if self.mode == self.MODE_TAPE:
+                dt = max(0.001, now - self._last_rot_time)
+                self._last_rot_time = now
+                inst_rate = abs(steps) / dt
+                self._velocity_est = 0.5 * self._velocity_est + 0.5 * inst_rate
+
+                if steps < 0:
+                    # Scratcha bakåt i tiden -> lås omedelbart upp från LIVE
+                    self.is_live = False
+                    self.is_dj_merging = False
+
                 self._pending_tape_steps += steps
                 self.last_touch_time = now
 
@@ -258,7 +292,7 @@ class TapeEngine:
                 return 0.0
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
             behind = (live_edge - self.head_pos) % self.tape.max_frames
-            if behind > self.tape.max_frames / 2 or behind < int(0.03 * self.sr):
+            if behind > self.tape.max_frames / 2 or behind < int(0.04 * self.sr):
                 return 0.0
             return max(0.0, behind / self.sr)
 
@@ -280,6 +314,37 @@ class TapeEngine:
             max_history = max(0, min(self.tape.total_recorded - self.live_latency_frames * 2,
                                      self.tape.max_frames - self.live_latency_frames * 2))
 
+            # --- DJ Merge to LIVE Crossfader ---
+            if self.is_dj_merging:
+                fade_frames = self.merge_fade_frames
+                cur_p = self.merge_fade_pos
+
+                pos_del = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                audio_del = self.tape.read_interp(pos_del)
+                self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+
+                pos_live = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
+                audio_live = self.tape.read_interp(pos_live)
+
+                # Equal-power sinus/cosinus kurva för silkeslen DJ-övergång
+                p_arr = np.linspace(cur_p, cur_p + frames_needed, frames_needed, endpoint=False) / fade_frames
+                p_arr = np.clip(p_arr, 0.0, 1.0)
+                fade_angle = p_arr * (np.pi / 2.0)
+                gain_del = np.cos(fade_angle)[:, np.newaxis]
+                gain_live = np.sin(fade_angle)[:, np.newaxis]
+
+                mixed = audio_del * gain_del + audio_live * gain_live
+
+                self.merge_fade_pos += frames_needed
+                if self.merge_fade_pos >= fade_frames:
+                    # Övergången är klar!
+                    self.is_dj_merging = False
+                    self.is_live = True
+                    self.head_pos = live_edge
+                    self.speed = 1.0
+
+                return mixed
+
             # --- MODE_VOL: Normal sömlös uppspelning från aktuell nålposition ---
             if self.mode == self.MODE_VOL:
                 if self.is_live:
@@ -297,8 +362,27 @@ class TapeEngine:
                 pos = (self.head_pos - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
                 return self.tape.read_interp(pos)
 
-            # --- MODE_TAPE: 1:1 Vinyl Scratch & Snabb Framåtspolning ---
+            # --- MODE_TAPE: Super Spool, 1:1 Vinyl Scratch & Bergfast LIVE ---
             elif self.mode == self.MODE_TAPE:
+                # Om vi redan är vid LIVE, förbli bergfast vid LIVE såvida inte användaren scratchar bakåt!
+                if self.is_live:
+                    steps = self._pending_tape_steps
+                    self._pending_tape_steps = 0
+                    if steps < 0:
+                        # Användaren scratchar bakåt i musikhistorien
+                        self.is_live = False
+                        back_dist = abs(steps * SAMPLES_PER_STEP)
+                        self.head_pos = (live_edge - back_dist) % self.tape.max_frames
+                        self.speed = float(np.clip(-back_dist / frames_needed, -6.0, -0.2))
+                        pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                        return self.tape.read_interp(pos)
+                    else:
+                        # Förbli 100% bergfast vid LIVE i realtid
+                        self.head_pos = live_edge
+                        self.speed = 1.0
+                        pos = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
+                        return self.tape.read_interp(pos)
+
                 if self.tape_stop_active:
                     self.speed += (0.0 - self.speed) * 0.15
                     if abs(self.speed) < 0.02:
@@ -313,59 +397,66 @@ class TapeEngine:
                 self._pending_tape_steps = 0
 
                 if steps != 0:
-                    # Användaren snurrar på hjulet
-                    # Dynamisk hastighetsacceleration framåt så man når LIVE på ett snabbt knyck
-                    gain = 1.0
+                    current_behind = (live_edge - self.head_pos) % self.tape.max_frames
+                    behind_sec = current_behind / self.sr if current_behind < self.tape.max_frames / 2 else 0.0
+
                     if steps > 0:
-                        if abs(steps) > 40:
-                            gain = 2.0
-                        if abs(steps) > 100:
+                        # SUPER SPOOL FRAMÅT MOT LIVE:
+                        # Flerstegs hastighetsacceleration baserad på rotationshastighet
+                        rate = self._velocity_est
+                        if rate > 2000:
+                            gain = 30.0
+                        elif rate > 1200:
+                            gain = 20.0
+                        elif rate > 600:
+                            gain = 10.0
+                        elif rate > 300:
                             gain = 4.0
-                        if abs(steps) > 200:
-                            gain = 6.0
+                        else:
+                            gain = 1.5
 
-                    effective_step = int(SAMPLES_PER_STEP * gain)
-                    delta_samples = steps * effective_step
+                        # Avstånds-boost: om man är långt bakom (>10s eller >25s) spolas det ännu snabbare
+                        if behind_sec > 25.0:
+                            gain *= 2.0
+                        elif behind_sec > 10.0:
+                            gain *= 1.5
 
-                    demanded_speed = delta_samples / frames_needed
-                    self.speed = float(np.clip(demanded_speed, -6.0, 6.0))
+                        effective_step = int(SAMPLES_PER_STEP * gain)
+                        delta_samples = steps * effective_step
 
-                    if steps > 0:
-                        # Spolar framåt mot LIVE
-                        behind = (live_edge - self.head_pos) % self.tape.max_frames
-                        if behind > self.tape.max_frames / 2 or delta_samples >= behind or behind <= int(0.04 * self.sr):
-                            # Lås bergfast vid LIVE (t-0)!
+                        # Magnet-lås mot LIVE vid nära eller passerat
+                        if (delta_samples >= current_behind or
+                            current_behind <= int(0.35 * self.sr) or
+                            current_behind > self.tape.max_frames / 2):
+                            # BERGFAST LÅSNING VID LIVE (t-0)!
                             self.head_pos = live_edge
                             self.is_live = True
                             self.speed = 1.0
                         else:
                             self.head_pos = (self.head_pos + delta_samples) % self.tape.max_frames
-                            self.is_live = False
+                            self.speed = float(np.clip(delta_samples / frames_needed, 1.0, 6.0))
+
                     else:
-                        # Scratchar bakåt
-                        self.is_live = False
+                        # BAKÅT: 1:1 autentisk vinylkänsla
+                        effective_step = SAMPLES_PER_STEP
+                        delta_samples = steps * effective_step
                         back_dist = abs(delta_samples)
-                        current_behind = (live_edge - self.head_pos) % self.tape.max_frames
                         remaining = max(0, max_history - current_behind)
                         if back_dist >= remaining:
                             self.head_pos = (live_edge - max_history) % self.tape.max_frames
                         else:
                             self.head_pos = (self.head_pos + delta_samples) % self.tape.max_frames
+                        self.speed = float(np.clip(delta_samples / frames_needed, -6.0, 0.0))
 
                 elif hand_on_wheel:
-                    # Handen vilar på hjulet stilla (scratch paus)
+                    # Handen vilar på hjulet i bandhistoriken (scratch paus)
                     self.speed += (0.0 - self.speed) * 0.5
                     if abs(self.speed) < 0.05:
                         self.speed = 0.0
                         return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
 
                 else:
-                    # Handen har släppt hjulet -> tallriken accelererar mjukt tillbaka till 1.0x
-                    if self.is_live:
-                        self.head_pos = live_edge
-                        pos = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
-                        return self.tape.read_interp(pos)
-
+                    # Handen släppt -> tallriken accelererar mjukt tillbaka till 1.0x
                     if self.speed < 1.0:
                         self.speed += (1.0 - self.speed) * 0.35
                         if abs(self.speed - 1.0) < 0.04:
@@ -377,7 +468,7 @@ class TapeEngine:
 
                     behind_head = (live_edge - self.head_pos) % self.tape.max_frames
                     step_frames = frames_needed * self.speed
-                    if step_frames > 0 and (step_frames >= behind_head or behind_head > self.tape.max_frames / 2):
+                    if step_frames > 0 and (step_frames >= behind_head or behind_head <= int(0.35 * self.sr) or behind_head > self.tape.max_frames / 2):
                         self.head_pos = live_edge
                         self.is_live = True
                         self.speed = 1.0
