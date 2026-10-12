@@ -26,8 +26,19 @@ _libdsp = None
 class _SVFState(ctypes.Structure):
     _fields_ = [("ic1eq", ctypes.c_float * 2), ("ic2eq", ctypes.c_float * 2)]
 
+class _EchoState(ctypes.Structure):
+    _fields_ = [
+        ("buf", ctypes.c_float * (48000 * 2)),
+        ("write_idx", ctypes.c_int),
+        ("delay_l", ctypes.c_int),
+        ("delay_r", ctypes.c_int),
+        ("damp_l", ctypes.c_float),
+        ("damp_r", ctypes.c_float),
+    ]
+
 for dsp_candidate in [
     Path(__file__).with_name("libdsp.so"),
+    Path(__file__).with_name("libdsp.dylib"),
     Path("/home/pyken/streamer/libdsp.so"),
     Path("/tmp/libdsp.so"),
 ]:
@@ -40,6 +51,16 @@ for dsp_candidate in [
                 ctypes.c_int,
                 ctypes.c_float
             ]
+            if hasattr(_libdsp, "echo_init"):
+                _libdsp.echo_init.argtypes = [ctypes.POINTER(_EchoState), ctypes.c_int]
+                _libdsp.echo_process_block.argtypes = [
+                    ctypes.POINTER(_EchoState),
+                    ctypes.POINTER(ctypes.c_float),
+                    ctypes.POINTER(ctypes.c_float),
+                    ctypes.c_int,
+                    ctypes.c_float,
+                    ctypes.c_float
+                ]
             break
         except Exception:
             pass
@@ -173,17 +194,19 @@ class TapeEngine:
         self.dj_svf_state = _SVFState()
         self._smooth_behind_sec = 0.0
 
-        # Auto DJ Smart Crossfade Transition state
+        # Auto DJ Echo Freeze & Drop Transition state (Pioneer DJM Club Standard)
         self.is_dj_transition = False
-        self.dj_trans_duration_s = 5.0
-        self.dj_trans_frames = int(5.0 * sample_rate)
+        self.dj_trans_duration_s = 4.5
+        self.dj_trans_frames = int(4.5 * sample_rate)
         self.dj_trans_pos = 0
         self.dj_trans_progress = 0.0
+        self.dj_trans_phase = "FREEZE"   # "FREEZE" (0..0.8s) eller "DROP" (0.8s..4.5s)
         self.dj_trans_track1_head = 0.0
-        self.dj_trans_t1_start = 0.0
-        self.dj_trans_t1_len = int(2.5 * sample_rate)
         self.dj_trans_svf_t1 = _SVFState()
-        self.dj_trans_svf_t2 = _SVFState()
+        self.dj_trans_echo_state = _EchoState()
+        self._py_echo_buf = np.zeros((48000, 2), dtype=np.float32)
+        self._py_echo_write_idx = 0
+        self._py_echo_damp = np.zeros(2, dtype=np.float32)
 
         self._lock = threading.Lock()
 
@@ -262,20 +285,24 @@ class TapeEngine:
                 self.dj_brake_active = bool(active)
             return self.dj_brake_active
 
-    def start_dj_transition(self, duration_s: float = 5.0):
-        """Startar en automatisk DJ Smart Crossfade-övergång till nästa låt."""
+    def start_dj_transition(self, duration_s: float = 4.5):
+        """Startar en professionell Echo Freeze & Drop DJ-övergång till nästa låt."""
         with self._lock:
             self.is_dj_transition = True
             self.dj_trans_duration_s = duration_s
             self.dj_trans_frames = int(duration_s * self.sr)
             self.dj_trans_pos = 0
             self.dj_trans_progress = 0.0
+            self.dj_trans_phase = "FREEZE"
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
-            self.dj_trans_t1_len = int(2.5 * self.sr)
-            self.dj_trans_t1_start = (live_edge - self.dj_trans_t1_len) % self.tape.max_frames
-            self.dj_trans_track1_head = self.dj_trans_t1_start
+            self.dj_trans_track1_head = self.head_pos if not self.is_live else live_edge
             self.dj_trans_svf_t1 = _SVFState()
-            self.dj_trans_svf_t2 = _SVFState()
+            if _libdsp is not None and hasattr(_libdsp, "echo_init"):
+                _libdsp.echo_init(ctypes.byref(self.dj_trans_echo_state), self.sr)
+            else:
+                self._py_echo_buf.fill(0.0)
+                self._py_echo_write_idx = 0
+                self._py_echo_damp.fill(0.0)
             self.dj_brake_active = False
 
     def end_dj_transition(self):
@@ -434,6 +461,28 @@ class TapeEngine:
             if behind > self.tape.max_frames / 2:
                 return 0.0
             return max(0.0, behind / self.sr)
+
+    def _py_echo_process(self, in_stereo: np.ndarray, echo_out: np.ndarray, frames: int, send: float, feedback: float):
+        """Mjuk fallback-processor för stereo-ekot om libdsp inte är tillgängligt."""
+        w = self._py_echo_write_idx
+        buf_len = 48000
+        dl = int(0.350 * self.sr)
+        dr = int(0.375 * self.sr)
+        for i in range(frames):
+            rl = (w - dl + buf_len) % buf_len
+            rr = (w - dr + buf_len) % buf_len
+            sl = float(self._py_echo_buf[rl, 0])
+            sr = float(self._py_echo_buf[rr, 1])
+            self._py_echo_damp[0] = 0.55 * self._py_echo_damp[0] + 0.45 * sl
+            self._py_echo_damp[1] = 0.55 * self._py_echo_damp[1] + 0.45 * sr
+            fl = float(np.clip(self._py_echo_damp[0] * feedback, -1.2, 1.2))
+            fr = float(np.clip(self._py_echo_damp[1] * feedback, -1.2, 1.2))
+            self._py_echo_buf[w, 0] = in_stereo[i, 0] * send + fl
+            self._py_echo_buf[w, 1] = in_stereo[i, 1] * send + fr
+            echo_out[i, 0] = sl
+            echo_out[i, 1] = sr
+            w = (w + 1) % buf_len
+        self._py_echo_write_idx = w
 
     # ----------------------------------------------------------------------- #
     # DSP Process Block (körs kontinuerligt för varje ljudblock)
@@ -676,57 +725,82 @@ class TapeEngine:
 
                 return out
 
-            # --- MODE_DJ: Resonant DJ Filter, Turntable Brake & Auto Smart Crossfade ---
+            # --- MODE_DJ: Echo Freeze & Drop (Pioneer DJM Club Standard) ---
             elif self.mode == self.MODE_DJ:
                 if self.is_dj_transition:
                     p = self.dj_trans_pos / float(max(1, self.dj_trans_frames))
                     self.dj_trans_progress = min(1.0, p)
+                    t_sec = p * self.dj_trans_duration_s
 
-                    # 1. Track 1 (Utgående låt från bandbufferten): Loop-roll + LPF sveper neråt + fade out
-                    loop_frames = max(256, self.dj_trans_t1_len)
-                    rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % loop_frames
-                    pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % loop_frames) % self.tape.max_frames
-                    self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % loop_frames) % self.tape.max_frames
+                    # 1. Track 1 Processing (High-Pass Tension Build -> Echo Freeze)
+                    pos_t1 = (self.dj_trans_track1_head + np.arange(frames_needed)) % self.tape.max_frames
+                    self.dj_trans_track1_head = (self.dj_trans_track1_head + frames_needed) % self.tape.max_frames
                     audio_t1 = self.tape.read_interp(pos_t1)
 
-                    wrap_idx = int(loop_frames - rel)
-                    if 0 <= wrap_idx < frames_needed:
-                        fade_len = min(256, frames_needed - wrap_idx)
-                        if fade_len > 0:
-                            fade_in = np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
-                            audio_t1[wrap_idx:wrap_idx + fade_len] *= fade_in
+                    FREEZE_POINT_S = 0.8  # 0.8 sekunder build-up innan drop
+                    is_pre_drop = (t_sec < FREEZE_POINT_S)
+                    self.dj_trans_phase = "FREEZE" if is_pre_drop else "DROP"
 
-                    f1 = float(np.clip(-0.15 - 0.75 * p, -1.0, 1.0))
-                    g1 = float(np.cos(p * np.pi * 0.5))
+                    if is_pre_drop:
+                        # HPF sveper uppåt från 0.0 till 0.45 (skär bas under 350Hz och bygger spänning)
+                        ramp_freeze = t_sec / FREEZE_POINT_S
+                        hpf_t1 = float(np.clip(0.45 * ramp_freeze, 0.0, 1.0))
+                        dry_gain_t1 = float(np.cos(ramp_freeze * np.pi * 0.5))
+                        send_echo = 1.0
+                        feedback = 0.70
+                    else:
+                        # Efter drop: ljudet är fryst i ekoloopen!
+                        hpf_t1 = 0.45
+                        dry_gain_t1 = 0.0
+                        send_echo = 0.0  # Frys delay-ingången!
+                        tail_rel = (t_sec - FREEZE_POINT_S) / max(0.01, self.dj_trans_duration_s - FREEZE_POINT_S)
+                        feedback = float(np.clip(0.70 * ((1.0 - tail_rel) ** 1.2), 0.0, 0.70))
 
-                    if _libdsp is not None:
+                    # Filtrera Track 1 med HPF (lyfter upp i taket)
+                    if _libdsp is not None and hpf_t1 >= 0.005:
                         audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
                         ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f1))
+                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(hpf_t1))
 
-                    audio_t1 *= g1
+                    # Kör genom stereo Echo Freeze motorn
+                    echo_out = np.zeros((frames_needed, 2), dtype=np.float32)
+                    if _libdsp is not None and hasattr(_libdsp, "echo_process_block"):
+                        audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
+                        ptr_in = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                        ptr_out = echo_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                        _libdsp.echo_process_block(
+                            ctypes.byref(self.dj_trans_echo_state),
+                            ptr_in,
+                            ptr_out,
+                            frames_needed,
+                            ctypes.c_float(send_echo),
+                            ctypes.c_float(feedback)
+                        )
+                    else:
+                        self._py_echo_process(audio_t1, echo_out, frames_needed, send_echo, feedback)
 
-                    # 2. Track 2 (Inkommande låt från realtidsströmmen): HPF sveper ned till neutralt + fade in
+                    out_t1 = audio_t1 * dry_gain_t1 + echo_out * 0.75
+
+                    # 2. Track 2 Processing (THE DROP!)
                     pos_t2 = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
                     audio_t2 = self.tape.read_interp(pos_t2)
 
-                    f2 = float(np.clip(0.85 * (1.0 - p), -1.0, 1.0))
-                    g2 = float(np.sin(p * np.pi * 0.5))
+                    if is_pre_drop:
+                        t2_gain = 0.0  # Tyst under de första 0.8s medan Track 1 bygger upp ekot
+                    else:
+                        # Droppar med 100% full bas och volym! Snabb 60ms mikro-ramp för att undvika knäpp
+                        drop_time = t_sec - FREEZE_POINT_S
+                        t2_gain = float(np.clip(drop_time / 0.06, 0.0, 1.0))
 
-                    if _libdsp is not None and f2 >= 0.005:
-                        audio_t2 = np.ascontiguousarray(audio_t2, dtype=np.float32)
-                        ptr2 = audio_t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t2), ptr2, frames_needed, ctypes.c_float(f2))
+                    out_t2 = audio_t2 * t2_gain
 
-                    audio_t2 *= g2
-
-                    # 3. Summering av båda spåren
-                    out = audio_t1 + audio_t2
+                    # 3. Summering: Track 1 Echo + Track 2 Full Drop
+                    out = out_t1 + out_t2
 
                     self.head_pos = live_edge
                     self.dj_trans_pos += frames_needed
                     if self.dj_trans_pos >= self.dj_trans_frames:
-                        # Övergången är klar! Lås sömlöst till Track 2 vid nutid
+                        # Övergången är klar! Fortsätt rent i nutid
                         self.is_dj_transition = False
                         self.is_live = True
                         self.head_pos = live_edge

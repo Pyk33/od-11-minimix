@@ -388,7 +388,7 @@ def on_btn_play_short():
             if getattr(tape, "is_dj_transition", False):
                 tape.end_dj_transition()
             else:
-                tape.start_dj_transition(5.0)
+                tape.start_dj_transition(4.5)
                 do_next()
         touch()
 
@@ -814,13 +814,17 @@ def render_dj_view(d, s, t):
     is_brake = getattr(tape, "dj_brake_active", False) if tape else False
     is_trans = getattr(tape, "is_dj_transition", False) if tape else False
     trans_p = getattr(tape, "dj_trans_progress", 0.0) if tape else 0.0
+    phase = getattr(tape, "dj_trans_phase", "FREEZE") if tape else "FREEZE"
 
     # 1. Header: DJ märke till vänster, filterstatus till höger
     d.rectangle([0, 0, 18, 9], fill=255)
     d.text((2, 0), "DJ", font=F_XS, fill=0)
 
     if is_trans:
-        stat = f"XFADE {int(trans_p * 100)}%"
+        if phase == "FREEZE":
+            stat = "FREEZE..."
+        else:
+            stat = f"DROP {int(trans_p * 100)}%"
     elif is_brake:
         stat = "[BRAKE]"
     elif abs(filt_val) < 0.01:
@@ -833,7 +837,7 @@ def render_dj_view(d, s, t):
     d.text((W_MAIN - text_w(d, stat, F_XS) - 2, 0), stat, font=F_XS, fill=255)
     d.line([(0, 10), (W_MAIN, 10)], fill=255)
 
-    # 2. Dynamisk filterkurva (y=14..42)
+    # 2. Dynamisk filterkurva / Echo visualisering (y=14..42)
     bx0, by0, bx1, by1 = 4, 14, 80, 42
     d.rectangle([bx0, by0, bx1, by1], outline=255)
 
@@ -841,43 +845,50 @@ def render_dj_view(d, s, t):
     h_box = by1 - by0
 
     if is_trans:
-        # Dual-track morph: T1 (LPF svep ner & fade) och T2 (HPF svep in & fade)
-        cutoff_t1 = max(0.05, 1.0 - trans_p * 0.85)
-        gain_t1 = math.cos(trans_p * math.pi * 0.5)
-        cutoff_t2 = max(0.05, (1.0 - trans_p) * 0.85)
-        gain_t2 = math.sin(trans_p * math.pi * 0.5)
+        if phase == "FREEZE":
+            # Fas 1: HPF lyfter uppåt + pulserande ekovågor
+            pts = []
+            for px in range(bx0 + 1, bx1):
+                rel_x = (px - bx0) / float(w_box)
+                cutoff_rel = 0.45 * (trans_p / 0.18)
+                if rel_x > cutoff_rel:
+                    resp = 0.75 + 0.08 * math.sin(rel_x * 8.0 + t * 8.0)
+                else:
+                    resp = 0.75 * math.exp(-6.0 * (cutoff_rel - rel_x))
+                py = int(by1 - 2 - resp * (h_box - 4))
+                pts.append((px, max(by0 + 2, min(by1 - 2, py))))
 
-        pts1, pts2 = [], []
-        for px in range(bx0 + 1, bx1):
-            rel_x = (px - bx0) / float(w_box)
+            for i in range(len(pts) - 1):
+                d.line([pts[i], pts[i+1]], fill=255, width=1)
+                if i % 4 == 0:
+                    d.line([(pts[i][0], pts[i][1]), (pts[i][0], by1 - 2)], fill=255)
 
-            # T1 LPF response (heldragen linje)
-            if rel_x < cutoff_t1:
-                r1 = (0.75 + 0.05 * math.sin(rel_x * 8.0 + t * 5.0)) * gain_t1
-            else:
-                r1 = 0.75 * math.exp(-6.0 * (rel_x - cutoff_t1)) * gain_t1
-            py1 = int(by1 - 2 - r1 * (h_box - 4))
-            pts1.append((px, max(by0 + 2, min(by1 - 2, py1))))
+        else:
+            # Fas 2: THE DROP! Track 2 spelar fullt, Track 1 eko dör ut i bakgrunden
+            pts = []
+            tail_decay = max(0.0, 1.0 - (trans_p - 0.18) / 0.82)
+            for px in range(bx0 + 1, bx1):
+                rel_x = (px - bx0) / float(w_box)
+                resp = 0.65 + 0.22 * math.sin(rel_x * 14.0 + t * 9.0) * math.cos(rel_x * 5.0 - t * 4.0)
+                py = int(by1 - 2 - resp * (h_box - 4))
+                pts.append((px, max(by0 + 2, min(by1 - 2, py))))
 
-            # T2 HPF response (streckad linje)
-            if rel_x > cutoff_t2:
-                r2 = (0.75 + 0.05 * math.sin(rel_x * 8.0 + t * 6.0)) * gain_t2
-            else:
-                r2 = 0.75 * math.exp(-6.0 * (cutoff_t2 - rel_x)) * gain_t2
-            py2 = int(by1 - 2 - r2 * (h_box - 4))
-            pts2.append((px, max(by0 + 2, min(by1 - 2, py2))))
+            for i in range(len(pts) - 1):
+                d.line([pts[i], pts[i+1]], fill=255, width=1)
+                if tail_decay > 0.05 and (i % 3 == 0):
+                    dot_y = by0 + 4 + int(((i * 7) % (h_box - 8)))
+                    d.point([(pts[i][0], dot_y)], fill=255)
 
-        for i in range(len(pts1) - 1):
-            d.line([pts1[i], pts1[i+1]], fill=255, width=1)
-            if (i // 2) % 2 == 0:
-                d.line([pts2[i], pts2[i+1]], fill=255, width=1)
-
-        # 3. Crossfade-mätare nederst (y=45..60)
-        d.text((4, 45), "T1:LPF", font=F_XS, fill=255)
-        d.text((bx1 - text_w(d, "T2:HPF", F_XS), 45), "T2:HPF", font=F_XS, fill=255)
+        # 3. Crossfade-mätare med Drop-notch (y=45..60)
+        d.text((4, 45), "ECHO", font=F_XS, fill=255)
+        d.text((bx1 - text_w(d, "DROP", F_XS), 45), "DROP", font=F_XS, fill=255)
 
         tl_y = 57
         d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
+        # Drop-notch vid 18% (där drop inträffar vid t=0.8s)
+        notch_x = bx0 + int(0.18 * (bx1 - bx0))
+        d.line([(notch_x, tl_y - 3), (notch_x, tl_y + 3)], fill=255)
+
         bar_w = int(trans_p * (bx1 - bx0))
         if bar_w > 0:
             d.rectangle([bx0, tl_y - 1, bx0 + bar_w, tl_y + 1], fill=255)
