@@ -252,6 +252,7 @@ class TapeEngine:
 
             if new_mode != self.MODE_DJ:
                 self.is_dj_transition = False
+                self.dj_filter_val = 0.0
 
             if new_mode == self.MODE_VOL:
                 # Återgång till VOL: fortsätt spela sömlöst från exakt där nålen befinner sig!
@@ -427,6 +428,12 @@ class TapeEngine:
             self.dj_trans_wait_timeout = 7.0  # Generös timeout för att vänta in Spotify-sökning och stabil audio
             self.dj_trans_svf_t1 = _SVFState()
             self.dj_trans_svf_t2 = _SVFState()
+            # Överför filtertillstånd från dj_svf_state så Track 1 behåller sitt filter sömlöst utan klick
+            if hasattr(self, "dj_svf_state"):
+                self.dj_trans_svf_t1.ic1eq_l = self.dj_svf_state.ic1eq_l
+                self.dj_trans_svf_t1.ic2eq_l = self.dj_svf_state.ic2eq_l
+                self.dj_trans_svf_t1.ic1eq_r = self.dj_svf_state.ic1eq_r
+                self.dj_trans_svf_t1.ic2eq_r = self.dj_svf_state.ic2eq_r
             if _libdsp is not None and hasattr(_libdsp, "echo_init"):
                 _libdsp.echo_init(ctypes.byref(self.dj_trans_echo_state), self.sr)
             self._py_echo_buf.fill(0.0)
@@ -435,7 +442,7 @@ class TapeEngine:
             self.dj_brake_active = False
 
     def end_dj_transition(self):
-        """Avslutar övergången omedelbart och låser till nutid."""
+        """Avslutar övergången omedelbart och låser till nutid med användarens filter intakt."""
         with self._lock:
             self.is_dj_transition = False
             self.dj_trans_state = "IDLE"
@@ -444,7 +451,6 @@ class TapeEngine:
             self.head_pos = live_edge
             self.is_live = True
             self.speed = 1.0
-            self.dj_filter_val = 0.0
 
     def toggle_loop_edit_mode(self) -> str:
         """Växlar encoderns funktion i LOOP-läge mellan SIZE (längd) och MOVE (flytta fönster)."""
@@ -560,8 +566,6 @@ class TapeEngine:
                             self.head_pos = (self.head_pos + shift) % self.tape.max_frames
 
             elif self.mode == self.MODE_DJ:
-                if self.is_dj_transition:
-                    return
                 # Ratten styr bi-polärt DJ-filter (-1.0 LPF .. 0.0 Clean .. +1.0 HPF)
                 # Anpassad för stor rotor: ca 400 steg för fullt svep från neutral till max
                 old_val = self.dj_filter_val
@@ -958,10 +962,13 @@ class TapeEngine:
                             if fade_len > 0:
                                 audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
 
-                        if _libdsp is not None:
+                        # Filter på Track 1: Använd användarens aktiva filterposition (eller -0.20 om neutral)
+                        F = self.dj_filter_val
+                        f_wait = F if abs(F) > 0.05 else -0.20
+                        if _libdsp is not None and abs(f_wait) >= 0.005:
                             audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
                             ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(-0.20))
+                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f_wait))
 
                         self.head_pos = live_edge
                         self.dj_trans_progress = 0.0
@@ -993,21 +1000,36 @@ class TapeEngine:
                             if fade_len > 0:
                                 audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
 
-                        if _libdsp is not None:
+                        F = self.dj_filter_val
+                        f_wait = F if abs(F) > 0.05 else -0.20
+                        if _libdsp is not None and abs(f_wait) >= 0.005:
                             audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
                             ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(-0.20))
+                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f_wait))
 
                         self.head_pos = live_edge
                         self.dj_trans_progress = 0.0
                         return audio_t1
 
-                    # FAS 3: DJ CROSSFADE MED LPF-GROOVE OCH HPF-DROPP
+                    # FAS 3: DJ CROSSFADE MED ANVÄNDARENS FILTERPOSITION (-1.0 LPF .. +1.0 HPF)
                     if self.dj_trans_state == "CROSSFADING":
                         p = self.dj_trans_pos / float(max(1, self.dj_trans_frames))
                         self.dj_trans_progress = min(1.0, p)
 
-                        # 1. Track 1: Rytmkärna tonas ut med LPF & rymdsvans
+                        # Filterkurvor anpassade efter användarens rattposition F
+                        F = self.dj_filter_val
+                        if F <= 0.0:
+                            f1_start = min(F, -0.20) if abs(F) <= 0.05 else F
+                            f1 = float(np.clip(f1_start - (0.85 + f1_start) * p, -1.0, 1.0))
+                            t2_entry = 0.65
+                            f2 = float(np.clip(t2_entry * (1.0 - p) + F * p, -1.0, 1.0))
+                        else:
+                            f1_start = F
+                            f1 = float(np.clip(f1_start + (0.90 - f1_start) * p, -1.0, 1.0))
+                            t2_entry = -0.50
+                            f2 = float(np.clip(t2_entry * (1.0 - p) + F * p, -1.0, 1.0))
+
+                        # 1. Track 1: Rytmkärna tonas ut med svepande filter & rymdsvans
                         rel = self.dj_trans_t1_phase
                         indices = (rel + np.arange(frames_needed)) % self.dj_trans_t1_len
                         pos_t1 = (self.dj_trans_t1_start + indices) % self.tape.max_frames
@@ -1020,11 +1042,9 @@ class TapeEngine:
                             if fade_len > 0:
                                 audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
 
-                        # LPF sveper neråt: -0.20 till -0.85
-                        f1 = float(np.clip(-0.20 - 0.70 * p, -1.0, 1.0))
                         g1 = float(np.cos(p * np.pi * 0.5))
 
-                        if _libdsp is not None:
+                        if _libdsp is not None and abs(f1) >= 0.005:
                             audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
                             ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
                             _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f1))
@@ -1044,14 +1064,13 @@ class TapeEngine:
 
                         out_t1 = audio_t1 * g1 + echo_out * (0.60 * (1.0 - p))
 
-                        # 2. Track 2: Inkommande låt vid live_edge + HPF svep in till rent
+                        # 2. Track 2: Inkommande låt vid live_edge + filter mot användarens position F
                         pos_t2 = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
                         audio_t2 = self.tape.read_interp(pos_t2)
 
-                        f2 = float(np.clip(0.70 * (1.0 - p), 0.0, 1.0))
                         g2 = float(np.sin(p * np.pi * 0.5))
 
-                        if _libdsp is not None and f2 >= 0.005:
+                        if _libdsp is not None and abs(f2) >= 0.005:
                             audio_t2 = np.ascontiguousarray(audio_t2, dtype=np.float32)
                             ptr2 = audio_t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
                             _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t2), ptr2, frames_needed, ctypes.c_float(f2))
@@ -1064,13 +1083,18 @@ class TapeEngine:
                         self.head_pos = live_edge
                         self.dj_trans_pos += frames_needed
                         if self.dj_trans_pos >= self.dj_trans_frames:
-                            # Övergången är klar! Lås sömlöst till Track 2 i nutid
+                            # Övergången är klar! Lås sömlöst till Track 2 med användarens filter intakt
                             self.is_dj_transition = False
                             self.dj_trans_state = "IDLE"
                             self.is_live = True
                             self.head_pos = live_edge
                             self.speed = 1.0
-                            self.dj_filter_val = 0.0
+                            # Kopiera SVF-tillstånd för klickfri handover till normal uppspelning
+                            if hasattr(self, "dj_svf_state") and hasattr(self, "dj_trans_svf_t2"):
+                                self.dj_svf_state.ic1eq_l = self.dj_trans_svf_t2.ic1eq_l
+                                self.dj_svf_state.ic2eq_l = self.dj_trans_svf_t2.ic2eq_l
+                                self.dj_svf_state.ic1eq_r = self.dj_trans_svf_t2.ic1eq_r
+                                self.dj_svf_state.ic2eq_r = self.dj_trans_svf_t2.ic2eq_r
 
                         return out
 

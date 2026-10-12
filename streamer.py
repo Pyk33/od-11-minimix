@@ -909,12 +909,15 @@ def render_dj_view(d, s, t):
     trans_state = getattr(tape, "dj_trans_state", "CROSSFADING") if tape else "CROSSFADING"
 
     if is_trans:
+        f_tag = ""
+        if abs(filt_val) >= 0.05:
+            f_tag = f" LPF" if filt_val < 0 else f" HPF"
         if trans_state == "WAIT_AUDIO":
-            stat = f"{int(bpm)}BPM WAIT"
+            stat = f"{int(bpm)}BPM WAIT{f_tag}"
         elif trans_state == "ALIGN_BEAT":
-            stat = f"{int(bpm)}BPM SYNC"
+            stat = f"{int(bpm)}BPM SYNC{f_tag}"
         else:
-            stat = f"{int(bpm)}BPM {int(trans_p * 100)}%"
+            stat = f"{int(bpm)}BPM {int(trans_p * 100)}%{f_tag}"
     elif is_brake:
         stat = "[BRAKE]"
     elif abs(filt_val) < 0.01:
@@ -935,16 +938,22 @@ def render_dj_view(d, s, t):
     h_box = by1 - by0
 
     if is_trans:
-        # Dual-track morph: T1 (LPF svep + rymdsvans) och T2 (HPF svep in till rent)
+        # Dual-track morph: T1 och T2 anpassat till användarens filterposition filt_val
         if trans_state in ("WAIT_AUDIO", "ALIGN_BEAT"):
-            cutoff_t1 = 0.85
+            cutoff_t1 = 0.5 + 0.45 * filt_val if filt_val < 0 else (0.5 + 0.4 * filt_val)
             gain_t1 = 1.0
-            cutoff_t2 = 0.70
+            cutoff_t2 = 0.70 if filt_val <= 0 else 0.30
             gain_t2 = 0.0
         else:
-            cutoff_t1 = max(0.05, 1.0 - trans_p * 0.85)
+            if filt_val <= 0:
+                c1_start = max(0.15, 0.5 + 0.45 * filt_val)
+                cutoff_t1 = max(0.05, c1_start * (1.0 - trans_p))
+                cutoff_t2 = 0.70 * (1.0 - trans_p) + (0.5 + 0.45 * filt_val) * trans_p
+            else:
+                c1_start = 0.5 + 0.4 * filt_val
+                cutoff_t1 = min(0.95, c1_start + (0.95 - c1_start) * trans_p)
+                cutoff_t2 = 0.30 * (1.0 - trans_p) + (0.5 + 0.4 * filt_val) * trans_p
             gain_t1 = math.cos(trans_p * math.pi * 0.5)
-            cutoff_t2 = max(0.05, (1.0 - trans_p) * 0.70)
             gain_t2 = math.sin(trans_p * math.pi * 0.5)
 
         pts1, pts2 = [], []
