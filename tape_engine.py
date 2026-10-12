@@ -281,6 +281,7 @@ class TapeEngine:
                 self.loop_beats = 4.0
                 self.loop_name = "1 BAR"
 
+                live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
                 anchor = int(self.head_pos if not self.is_live else live_edge)
                 loop_start, bar_len, bpm = self._detect_natural_loop(anchor)
                 self.loop_bpm = bpm
