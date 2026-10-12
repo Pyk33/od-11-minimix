@@ -605,19 +605,23 @@ def draw_control_sidebar(d, items):
             d.ellipse([gx, gy, gx + 6, gy + 6], outline=255)
             d.point([(gx + 3, gy + 3), (gx + 3, gy + 1), (gx + 1, gy + 3)], fill=255)
         elif glyph == "top_tap":
-            d.rectangle([gx + 1, gy, gx + 5, gy + 8], outline=255)
-            d.rectangle([gx + 2, gy + 1, gx + 4, gy + 3], fill=255)
+            # Solid fylld upp-pil (Övre knapp kort tryck)
+            d.polygon([(gx + 3, gy + 1), (gx, gy + 7), (gx + 6, gy + 7)], fill=255)
         elif glyph == "top_hold":
-            d.rectangle([gx + 1, gy, gx + 5, gy + 8], outline=255)
-            d.rectangle([gx + 2, gy + 1, gx + 4, gy + 3], fill=255)
-            d.line([(gx, gy + 10), (gx + 6, gy + 10)], fill=255)
+            # Vinkel-pil / förgrening ↳ (Övre knapp långt tryck / håll)
+            d.line([(gx + 2, gy), (gx + 2, gy + 5)], fill=255)
+            d.line([(gx + 2, gy + 5), (gx + 6, gy + 5)], fill=255)
+            d.line([(gx + 5, gy + 3), (gx + 7, gy + 5)], fill=255)
+            d.line([(gx + 5, gy + 7), (gx + 7, gy + 5)], fill=255)
         elif glyph == "btm_tap":
-            d.rectangle([gx + 1, gy, gx + 5, gy + 8], outline=255)
-            d.rectangle([gx + 2, gy + 5, gx + 4, gy + 7], fill=255)
+            # Solid fylld ner-pil (Nedre knapp kort tryck)
+            d.polygon([(gx, gy + 1), (gx + 6, gy + 1), (gx + 3, gy + 7)], fill=255)
         elif glyph == "btm_hold":
-            d.rectangle([gx + 1, gy, gx + 5, gy + 8], outline=255)
-            d.rectangle([gx + 2, gy + 5, gx + 4, gy + 7], fill=255)
-            d.line([(gx, gy + 10), (gx + 6, gy + 10)], fill=255)
+            # Vinkel-pil / förgrening ↳ (Nedre knapp långt tryck / håll)
+            d.line([(gx + 2, gy), (gx + 2, gy + 5)], fill=255)
+            d.line([(gx + 2, gy + 5), (gx + 6, gy + 5)], fill=255)
+            d.line([(gx + 5, gy + 3), (gx + 7, gy + 5)], fill=255)
+            d.line([(gx + 5, gy + 7), (gx + 7, gy + 5)], fill=255)
 
         d.text((gx + 9, y), label, font=F_XS, fill=255)
 
