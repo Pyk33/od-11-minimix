@@ -287,6 +287,17 @@ class TapeEngine:
                 return 0.0
             return max(0.0, behind / self.sr)
 
+    def get_loop_behind_live_sec(self) -> float:
+        """Sekunder mellan LIVE och loopens startpunkt."""
+        with self._lock:
+            if not self.loop_active:
+                return 0.0
+            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+            behind = (live_edge - self.loop_start_pos) % self.tape.max_frames
+            if behind > self.tape.max_frames / 2:
+                return 0.0
+            return max(0.0, behind / self.sr)
+
     # ----------------------------------------------------------------------- #
     # DSP Process Block (körs kontinuerligt för varje ljudblock)
     # ----------------------------------------------------------------------- #

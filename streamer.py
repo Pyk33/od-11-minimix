@@ -694,22 +694,17 @@ def render_loop_view(d, s, t):
     loop_sec = tape.loop_length_s if tape else 2.0
     edit_mode = getattr(tape, "loop_edit_mode", "SIZE") if tape else "SIZE"
 
-    d.rectangle([0, 0, 30, 9], fill=255)
+    # Header: LOOP badge till vänster, aktivt läge (SIZE eller MOVE) till höger
+    d.rectangle([0, 0, 26, 9], fill=255)
     d.text((2, 0), "LOOP", font=F_XS, fill=0)
 
-    mode_tag = f"[{edit_mode}]"
-    d.text((W_MAIN - text_w(d, mode_tag, F_XS) - 2, 0), mode_tag, font=F_XS, fill=255)
+    d.text((W_MAIN - text_w(d, edit_mode, F_XS) - 2, 0), edit_mode, font=F_XS, fill=255)
     d.line([(0, 10), (W_MAIN, 10)], fill=255)
 
-    sec_str = f"{loop_sec:.3f}s" if loop_sec < 0.5 else (f"{loop_sec:.2f}s" if loop_sec < 1.0 else f"{loop_sec:.1f}s")
-    if tape and tape.loop_reverse:
-        sec_str += " (REV)"
-    d.text((2, 13), f"LEN:{sec_str}", font=F_XS, fill=255)
-
-    box_x0, box_y0, box_x1, box_y1 = 4, 25, 80, 41
+    # Loop-fönster med faslåst playhead i perfekt synk med ljudet
+    box_x0, box_y0, box_x1, box_y1 = 4, 15, 80, 34
     d.rectangle([box_x0, box_y0, box_x1, box_y1], outline=255)
 
-    # Faslåst playhead: rör sig i perfekt synk med ljudet ur högtalaren!
     frac = tape.get_loop_progress() if tape else 0.0
     head_x = box_x0 + frac * (box_x1 - box_x0)
     d.line([(head_x, box_y0 + 2), (head_x, box_y1 - 2)], fill=255, width=2)
@@ -718,8 +713,29 @@ def render_loop_view(d, s, t):
         sx = box_x0 + seg * (box_x1 - box_x0) / 4.0
         d.line([(sx, box_y1 - 3), (sx, box_y1 - 1)], fill=255)
 
-    knob_lbl = "[SIZE] MOV" if edit_mode == "SIZE" else "SIZ [MOV]"
-    d.text((2, 53), knob_lbl, font=F_XS, fill=255)
+    # Under loopen:
+    # 1. Hur mycket vi loopar (loop-längd)
+    sec_str = f"{loop_sec:.3f}s" if loop_sec < 0.5 else (f"{loop_sec:.2f}s" if loop_sec < 1.0 else f"{loop_sec:.1f}s")
+    if tape and getattr(tape, "loop_reverse", False):
+        sec_str += " REV"
+    d.text((4, 38), f"LEN: {sec_str}", font=F_XS, fill=255)
+
+    # 2. Var i låten vi loopar (spårposition eller tid bakom live)
+    behind_sec = tape.get_loop_behind_live_sec() if (tape and hasattr(tape, "get_loop_behind_live_sec")) else (
+        tape.get_time_behind_live_sec() if tape else 0.0
+    )
+    now = time.monotonic()
+    if s["dur_ms"] > 0:
+        live_song_ms = s["pos_ms"] + ((now - s["stamp"]) * 1000 if s["playing"] else 0)
+        loop_song_ms = max(0, live_song_ms - behind_sec * 1000)
+        mm = int(loop_song_ms // 60000)
+        ss = int((loop_song_ms // 1000) % 60)
+        pos_str = f"{mm:02d}:{ss:02d}"
+    else:
+        mm = int(behind_sec // 60)
+        ss = int(behind_sec % 60)
+        pos_str = f"-{mm:02d}:{ss:02d}"
+    d.text((4, 50), f"AT:  {pos_str}", font=F_XS, fill=255)
 
     loop_items = [
         ("rot", edit_mode),

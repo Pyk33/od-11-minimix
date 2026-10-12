@@ -62,9 +62,16 @@ En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz s
 ### 3. `LOOP` (Instant Looper: Framåt-expansion & Glidande Fönster)
 Fångar omedelbart en slinga av musiken och upprepar den med klickfria equal-power crossfades.
 
-- **Display:** Visar aktiv slinga, looplängd i sekunder, aktivt rattläge (`[SIZE] MOVE` eller `SIZE [MOVE]`), samt en faslåst loopindikator som rör sig i perfekt takt med takten i högtalaren.
-- **Trafikljusikon (nedre högra hörnet):**
-  - Övre knapp fylld + `SWAP`: Klicka övre knappen för att växla ratten mellan `[SIZE]` (längd) och `[MOVE]` (flytta loopen).
+- **Display:** 
+  - Topprad: `LOOP` märke till vänster och aktivt encoder-läge (`SIZE` eller `MOVE`) till höger.
+  - Mitten: Loop-fönster med faslåst playhead och taktnischer som rör sig i perfekt synk med ljudet.
+  - Under loopen: `LEN: <längd>` (hur mycket vi loopar, inkl. `REV`) samt `AT: <tid>` (var i låten vi loopar, t.ex. `AT: 01:45` eller `AT: -00:15`).
+- **Höger kommandokolumn (sidebar):**
+  - `◎ SIZE/MOVE`: Rattstyrning (ändra looplängd eller flytta loopfönstret).
+  - `▲ SWAP`: Kort tryck på övre knappen växlar ratten mellan `SIZE` och `MOVE`.
+  - `↳ REV`: Håll övre knappen för att spela loopen baklänges!
+  - `▼ TAPE`: Kort tryck på nedre knappen växlar till `TAPE`.
+  - `↳ VOL`: Håll nedre knappen för att återgå till standard volymläge.
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
