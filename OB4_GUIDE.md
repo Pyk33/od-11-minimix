@@ -19,27 +19,34 @@ Mini-Mix har tre rena driftslägen:
 
 ---
 
+## 🖥️ Dedikerad 1 cm Kontroll-Sidebar (Alltid på skärmen)
+Till höger på OLED-skärmen finns en dedikerad 1 cm bred kolumn (`x=84..127`) som alltid visar vad de 5 kontrollerna gör i det aktuella läget:
+1. `[◎]` **Rotor (Ratten):** Styr volym, bandspolning eller looplängd/position.
+2. `[■|□]` **Övre kort (Tap):** Primär åtgärd (Play/Pause, DJ Merge to LIVE, växla loopläge).
+3. `[■|□]_` **Övre långt (Hold):** Sekundär åtgärd (Mute, direkt snitt till LIVE, Reverse loop).
+4. `[□|■]` **Nedre kort (Tap):** Nästa låt eller hoppa mellan kreativa lägen (`TAPE` ↔ `LOOP`).
+5. `[□|■]_` **Nedre långt (Hold):** Växla in i `TAPE` eller återgå till `VOL`.
+
+---
+
 ### 1. `VOL` (Standardläge / Normal Lyssning)
 Normal uppspelning från Spotify Connect eller AirPlay.
 
-| Kontroll | Åtgärd | Funktion |
-|---|---|---|
-| **Rotary Encoder** | Vrid medurs / moturs | Höj / sänk volym (0–85 %). Stor TE-volymoverlay visas på skärmen. |
-| **Övre knapp (Play/Pause `IO22`)** | Klick | Play / Pause (Spotify / AirPlay). |
-| | Håll (>0.5 s) | Mute / Unmute (eller hoppa till LIVE om du lyssnar med bandfördröjning). |
-| **Nedre knapp (Next `IO23`)** | Klick | Nästa låt (Spotify / AirPlay). |
-| | Håll (>0.5 s) | **Gå in i OB-4 `TAPE` Mode!** |
+| Kontroll | Symbol | Åtgärd | Funktion |
+|---|---|---|---|
+| **Rotary Encoder** | `[◎]` | Vrid | Höj / sänk volym (0–85 %). Stor TE-volymoverlay. |
+| **Övre knapp (`IO22`)** | `[■|□]` | Klick | Play / Pause. |
+| | `[■|□]_` | Håll (>0.5 s) | Mute / Unmute (eller LIVE vid eftersläpning). |
+| **Nedre knapp (`IO23`)** | `[□|■]` | Klick | Nästa låt (Spotify / AirPlay). |
+| | `[□|■]_` | Håll (>0.5 s) | **Gå in i OB-4 `TAPE` Mode!** |
 
 ---
 
 ### 2. `TAPE` (OB-4 Magic Tape: Scrub, Rewind & Spool till LIVE)
-En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz stereo. I detta läge kan du spola bakåt och framåt i tiden med autentisk 1:1 slipmat-känsla och mekanisk tröghet.
+En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz stereo.
 
-- **Display:** Visar två animerade rullbandshjul som snurrar i takt med bandhastigheten, tidsskillnad mot live (`LIVE` eller `-MM:SS`), och bandhuvud.
-- **Trafikljusikon (nedre högra hörnet):** En vertikal 2-knappskapsel visar med en fylld kvadrat vilken fysisk knapp som tipsas om:
-  - Övre knapp fylld + `LIVE`: Klicka övre knapp för 1-klick DJ Merge till nutid!
-  - Övre knapp fylld + `PLAY`: Klicka övre knapp för att starta musiken igen.
-  - Nedre knapp fylld + `LOOP`: Klicka nedre knapp för att hoppa till Loop-läget.
+- **Vänster visning (`0..84 px`):** Visar animerade rullbandshjul som snurrar i takt med bandhastigheten samt tidsskillnad mot live (`LIVE` eller `-MM:SS`).
+- **Höger sidebar (`85..127 px`):** Visar `SCRUB`, `LIVE`/`PAUS`, `CUT`, `LOOP`, `VOL`.
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|

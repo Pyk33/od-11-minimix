@@ -109,7 +109,7 @@ class TapeEngine:
 
         # Nålposition och live-låsning
         self.head_pos = 0.0
-        self.live_latency_frames = int(0.04 * sample_rate)  # 40 ms live-fördröjning
+        self.live_latency_frames = int(0.08 * sample_rate)  # 80 ms live-jitterbuffert (mjuk & flimmerfri)
         self.initialized_head = False
         self.is_live = True
 
@@ -339,8 +339,19 @@ class TapeEngine:
             # --- MODE_VOL: Normal sömlös uppspelning från aktuell nålposition ---
             if self.mode == self.MODE_VOL:
                 if self.is_live:
-                    self.head_pos = live_edge
-                    pos = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
+                    pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+                    self.speed = 1.0
+
+                    # Mjuk faslåsning mot live_edge för att absorbera ALSA-trådjitter
+                    dist = (live_edge - self.head_pos) % self.tape.max_frames
+                    if dist > self.tape.max_frames / 2:
+                        dist -= self.tape.max_frames
+                    if abs(dist) > int(0.5 * self.sr):
+                        self.head_pos = live_edge
+                    elif abs(dist) > 150:
+                        nudge = np.clip(dist * 0.005, -1.5, 1.5)
+                        self.head_pos = (self.head_pos + nudge) % self.tape.max_frames
                     return self.tape.read_interp(pos)
 
                 behind_head = (live_edge - self.head_pos) % self.tape.max_frames
@@ -368,10 +379,19 @@ class TapeEngine:
                         pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
                         return self.tape.read_interp(pos)
                     else:
-                        # Förbli 100% bergfast vid LIVE i realtid
-                        self.head_pos = live_edge
+                        # Förbli 100% bergfast vid LIVE i realtid utan ljudflimmer
+                        pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                        self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
                         self.speed = 1.0
-                        pos = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
+
+                        dist = (live_edge - self.head_pos) % self.tape.max_frames
+                        if dist > self.tape.max_frames / 2:
+                            dist -= self.tape.max_frames
+                        if abs(dist) > int(0.5 * self.sr):
+                            self.head_pos = live_edge
+                        elif abs(dist) > 150:
+                            nudge = np.clip(dist * 0.005, -1.5, 1.5)
+                            self.head_pos = (self.head_pos + nudge) % self.tape.max_frames
                         return self.tape.read_interp(pos)
 
                 hand_on_wheel = (now - self.last_touch_time <= self.release_timeout)
