@@ -8,7 +8,7 @@ Funktioner inspirerade av Teenage Engineering OB-4:
   3. DJ Merge to LIVE: silkeslen equal-power crossfade vid återgång till realtidsmusiken.
   4. Instant looper (framåtriktad tidsförlängning & glidande tidsfönster längs låten).
   5. Sömlös uppspelningskontinuitet (musiken fortsätter alltid från aktuell punkt utan hopp).
-  6. Tape Stop (simulerar skivspelare/bandavstängning med realistisk retardation).
+  6. Bergfast LIVE-lås och renodlad Play/Pause vid t-0.
 """
 import math
 import threading
@@ -118,7 +118,6 @@ class TapeEngine:
         self.speed = 1.0
         self.last_touch_time = 0.0
         self.release_timeout = 0.080    # 80 ms utan pulser = handen har släppt skivan
-        self.tape_stop_active = False
 
         # Dynamisk hastighetsmätning över pulsskurar
         self._last_rot_time = 0.0
@@ -147,17 +146,16 @@ class TapeEngine:
         with self._lock:
             if new_mode == self.mode:
                 return
+            old_mode = self.mode
             self.mode = new_mode
 
             if new_mode == self.MODE_VOL:
                 # Återgång till VOL: fortsätt spela sömlöst från exakt där nålen befinner sig!
                 self.speed = 1.0
-                self.tape_stop_active = False
                 self._pending_tape_steps = 0
 
             elif new_mode == self.MODE_TAPE:
                 # Gå in i TAPE: behåll nålen exakt på låten där den spelar
-                self.tape_stop_active = False
                 self._pending_tape_steps = 0
 
             elif new_mode == self.MODE_LOOP:
@@ -200,17 +198,10 @@ class TapeEngine:
                 self.is_dj_merging = False
                 self.speed = 1.0
                 self._pending_tape_steps = 0
-                self.tape_stop_active = False
             else:
                 # Mjuk DJ Merge Crossfade!
                 self.is_dj_merging = True
                 self.merge_fade_pos = 0
-                self.tape_stop_active = False
-
-    def toggle_tape_stop(self):
-        """Växlar skivspelarmotorns strömbrytare (autentisk retardation/start)."""
-        with self._lock:
-            self.tape_stop_active = not self.tape_stop_active
 
     def on_encoder_rotated(self, steps: int):
         """
@@ -382,15 +373,6 @@ class TapeEngine:
                         self.speed = 1.0
                         pos = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
                         return self.tape.read_interp(pos)
-
-                if self.tape_stop_active:
-                    self.speed += (0.0 - self.speed) * 0.15
-                    if abs(self.speed) < 0.02:
-                        self.speed = 0.0
-                        return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
-                    pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
-                    self.head_pos = (self.head_pos + frames_needed * self.speed) % self.tape.max_frames
-                    return self.tape.read_interp(pos)
 
                 hand_on_wheel = (now - self.last_touch_time <= self.release_timeout)
                 steps = self._pending_tape_steps

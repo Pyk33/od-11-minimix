@@ -41,7 +41,7 @@ En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz s
 |---|---|---|
 | **Rotary Encoder** | Vrid moturs | **Scratcha bakåt i musikhistorien!** (1:1 autentisk vinylkänsla). |
 | | Vrid medurs | **Super Spool framåt mot LIVE:** Snabb vridning accelererar spolningen exponentiellt (upp till 30x) så du sveper 30–60 sekunder på nolltid. Spärras och fastnar bergfast vid LIVE (t-0). |
-| **Play/Pause (`IO22`)** | Klick | **1-KLICK DJ MERGE TO LIVE!** Om du ligger bakom nutid görs en mjuk equal-power DJ-crossfade som stilrent mixar bandet in i realtidsströmmen! Vid LIVE: Tape Stop motorbroms. |
+| **Play/Pause (`IO22`)** | Klick | **1-KLICK DJ MERGE TO LIVE!** Om du ligger bakom nutid görs en mjuk equal-power DJ-crossfade som stilrent mixar bandet in i realtidsströmmen! Vid LIVE: Vanlig **Play / Pause** (pausar musiken och visar `PAUSED`). |
 | | Håll (>0.5 s) | **Direkt snitt till LIVE:** Omedelbart klipp fram till realtidsströmmen utan fade. |
 | **Next (`IO23`)** | Klick | Växla till **`LOOP` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Låten fortsätter spela sömlöst framåt från exakt den punkt nålen befinner sig på! |

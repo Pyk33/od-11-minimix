@@ -372,7 +372,8 @@ def on_btn_play_short():
             if behind_sec > 0.08:
                 tape.jump_to_live(dj_merge=True)
             else:
-                tape.toggle_tape_stop()
+                # Vid LIVE: vanlig Play/Pause!
+                do_playpause()
         touch()
     elif m == "LOOP":
         if tape:
@@ -599,8 +600,13 @@ def render_tape_view(d, s, t):
     d.text((W - text_w(d, status, F_XS) - 2, 0), status, font=F_XS, fill=255)
     d.line([(0, 10), (W, 10)], fill=255)
 
-    angle_l = t * speed * 4.0
-    angle_r = t * speed * 3.5
+    is_playing = s.get("playing", True)
+    if not is_playing:
+        angle_l, angle_r = 0.0, 0.0
+    else:
+        angle_l = t * speed * 4.0
+        angle_r = t * speed * 3.5
+
     draw_tape_reel(d, 28, 30, 13, angle_l)
     draw_tape_reel(d, 100, 30, 13, angle_r)
 
@@ -610,10 +616,10 @@ def render_tape_view(d, s, t):
     d.rectangle([59, 23, 69, 37], outline=255)
     d.line([(64, 25), (64, 35)], fill=255)
 
-    if is_merging:
+    if not is_playing:
+        sp_str = "PAUSED"
+    elif is_merging:
         sp_str = "DJ MERGE..."
-    elif tape and tape.tape_stop_active:
-        sp_str = "STOPPED"
     elif behind_sec < 0.08:
         sp_str = "LIVE (t-0)"
     elif abs(speed - 1.0) > 0.15:
@@ -621,7 +627,13 @@ def render_tape_view(d, s, t):
     else:
         sp_str = "PLAYING"
     d.text((2, 53), sp_str, font=F_XS, fill=255)
-    hint = "BTN1:LIVE" if (behind_sec > 0.08 and not is_merging) else "BTN2:LOOP"
+
+    if behind_sec > 0.08 and not is_merging:
+        hint = "BTN1:LIVE"
+    elif not is_playing:
+        hint = "BTN1:PLAY"
+    else:
+        hint = "BTN2:LOOP"
     d.text((W - text_w(d, hint, F_XS) - 2, 53), hint, font=F_XS, fill=255)
 
 
