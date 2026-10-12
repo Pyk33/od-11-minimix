@@ -10,11 +10,12 @@ Mini-Mix har tre rena driftslägen:
 - **`VOL`**: Normal lyssning med volymkontroll.
 - **`TAPE`**: 1:1 vinyl slipmat scratch, spolning och snabb framåtspolning till LIVE (t-0).
 - **`LOOP`**: Instant looper med framåtriktad tidsförlängning och flyttbart loopfönster.
+- **`DJ`**: Klubb-filter (LPF / HPF) med resonant filterkurva och Turntable Tape Brake (skivbroms).
 
 ```
-[ VOL ] ──(Håll Next >0.5s)──> [ TAPE ] ──(Klicka Next)──> [ LOOP ]
-   ▲                              │                           │
-   └────────(Håll Next >0.5s)─────┴───────────────────────────┘
+[ VOL ] ──(Håll Next >0.5s)──> [ TAPE ] ──(Klick Next)──> [ LOOP ] ──(Klick Next)──> [ DJ ]
+   ▲                              │                           │                          │
+   └────────(Håll Next >0.5s)─────┴───────────────────────────┴──────────────────────────┘
 ```
 
 ---
@@ -71,7 +72,7 @@ Fångar omedelbart en slinga av musiken och upprepar den med klickfria equal-pow
   - `◎ SIZE/MOVE`: Rattstyrning (ändra looplängd eller flytta loopfönstret).
   - `▲ SWAP`: Kort tryck på övre knappen växlar ratten mellan `SIZE` och `MOVE`.
   - `↳ REV`: Håll övre knappen för att spela loopen baklänges!
-  - `▼ TAPE`: Kort tryck på nedre knappen växlar till `TAPE`.
+  - `▼ DJ`: Kort tryck på nedre knappen växlar till `DJ`.
   - `↳ VOL`: Håll nedre knappen för att återgå till standard volymläge.
 
 | Kontroll | Åtgärd | Funktion |
@@ -80,8 +81,33 @@ Fångar omedelbart en slinga av musiken och upprepar den med klickfria equal-pow
 | | Håll (>0.5 s) | **Reverse Loop:** Spela loopen baklänges (`REV`)! |
 | **Rotary Encoder (i `SIZE`)** | Vrid | **Öka / minska looptid:** När du ökar längden läggs den nya tiden till **framåt i låten** så att kommande takter kommer in i loopen! Stegar mellan 0.125 s upp till 16.0 s. |
 | **Rotary Encoder (i `MOVE`)** | Vrid | **Flytta loopen längs tidslinjen:** Skjuter hela loopfönstret framåt eller bakåt genom musiken så du kan hitta det perfekta partiet att loopa. |
-| **Nedre knapp (`IO23`)** | Klick | Växla tillbaka till **`TAPE` Mode**. |
+| **Nedre knapp (`IO23`)** | Klick | Växla till **`DJ` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Musiken fortsätter spela sömlöst framåt från loopens position in i resten av låten! |
+
+---
+
+### 4. `DJ` (DJ Color Filter & Turntable Tape Brake)
+Ett kraftfullt och festanpassat DJ-verktyg utformat för att bygga upp stämning, skapa episka beat drops och köra turntable-bromsar.
+
+- **Display:**
+  - Topprad: `DJ` märke till vänster och aktiv filterstatus till höger (`CLEAN`, `LPF -45%`, `HPF +60%`, eller `[BRAKE]`).
+  - Mitten: **Levande frekvenskurva** som animeras och visar exakt hur bas eller diskant skärs bort, med rytmiskt dansande spektrumprickar.
+  - Nederst: Bi-polär filtermätare med mittpunkt vid neutralt (`CLEAN`).
+- **Höger kommandokolumn (sidebar):**
+  - `◎ FILTER`: Bi-polärt DJ-filter (vrid vänster för LPF / vrid höger för HPF).
+  - `▲ DROP`: Kort tryck på övre knappen snäpper omedelbart tillbaka till `CLEAN` (perfekt för beat drop!).
+  - `↳ BRAKE`: Håll övre knappen för **Turntable Brake / Tape Stop** (musiken saktar in och stannar som en vinylspelare vars motor stängts av!).
+  - `▼ TAPE`: Kort tryck på nedre knappen växlar till `TAPE`.
+  - `↳ VOL`: Håll nedre knappen för att återgå till standard volymläge.
+
+| Kontroll | Åtgärd | Funktion |
+|---|---|---|
+| **Rotary Encoder (Vrid vänster)** | Vrid | **Low-Pass Filter (LPF):** Skär bort diskant och sång. Ljudet blir djupt och mörkt som om du står i toalettkön utanför klubben! |
+| **Rotary Encoder (Vrid höger)** | Vrid | **High-Pass Filter (HPF):** Skär bort bas och kick för att bygga upp maximal förväntan inför ett drop! |
+| **Övre knapp (`IO22`)** | Klick | **BEAT DROP / CLEAN:** Snäpper filtret direkt till neutralt (0 %) på ett klick så hela ljudet exploderar tillbaka i rummet! |
+| | Håll (>0.5 s) | **TURNTABLE BRAKE (Tape Stop):** Skivspelarens motor stängs av och musiken saktar in till ett stopp (*wwwhhhoooom*). Släpp för att varva upp igen! |
+| **Nedre knapp (`IO23`)** | Klick | Växla vidare till **`TAPE` Mode**. |
+| | Håll (>0.5 s) | **Återgå till `VOL` Mode**. |
 
 ---
 

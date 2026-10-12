@@ -382,6 +382,10 @@ def on_btn_play_short():
         if tape:
             tape.toggle_loop_edit_mode()
         touch()
+    elif m == "DJ":
+        if tape:
+            tape.reset_dj_filter()
+        touch()
 
 
 def on_btn_play_long():
@@ -402,6 +406,10 @@ def on_btn_play_long():
     elif m == "LOOP":
         if tape:
             tape.loop_reverse = not tape.loop_reverse
+        touch()
+    elif m == "DJ":
+        if tape:
+            tape.trigger_dj_brake()
         touch()
 
 
@@ -777,10 +785,89 @@ def render_loop_view(d, s, t):
         ("rot", edit_mode),
         ("top_tap", "SWAP"),
         ("top_hold", "REV"),
-        ("btm_tap", "TAPE"),
+        ("btm_tap", "DJ"),
         ("btm_hold", "VOL"),
     ]
     draw_control_sidebar(d, loop_items)
+
+
+def render_dj_view(d, s, t):
+    filt_val = getattr(tape, "dj_filter_val", 0.0) if tape else 0.0
+    is_brake = getattr(tape, "dj_brake_active", False) if tape else False
+
+    # 1. Header: DJ märke till vänster, filterstatus till höger
+    d.rectangle([0, 0, 18, 9], fill=255)
+    d.text((2, 0), "DJ", font=F_XS, fill=0)
+
+    if is_brake:
+        stat = "[BRAKE]"
+    elif abs(filt_val) < 0.04:
+        stat = "CLEAN"
+    elif filt_val < 0:
+        stat = f"LPF {int(abs(filt_val)*100)}%"
+    else:
+        stat = f"HPF {int(filt_val*100)}%"
+
+    d.text((W_MAIN - text_w(d, stat, F_XS) - 2, 0), stat, font=F_XS, fill=255)
+    d.line([(0, 10), (W_MAIN, 10)], fill=255)
+
+    # 2. Dynamisk filterkurva (y=14..42)
+    bx0, by0, bx1, by1 = 4, 14, 80, 42
+    d.rectangle([bx0, by0, bx1, by1], outline=255)
+
+    w_box = bx1 - bx0
+    h_box = by1 - by0
+    pts = []
+
+    for px in range(bx0 + 1, bx1):
+        rel_x = (px - bx0) / float(w_box)
+        if abs(filt_val) < 0.04:
+            resp = 0.7 + 0.08 * math.sin(rel_x * 9.0 + t * 4.0)
+        elif filt_val < 0:
+            cutoff_rel = 1.0 - abs(filt_val) * 0.85
+            if rel_x < cutoff_rel:
+                resp = 0.75 + 0.05 * math.sin(rel_x * 8.0 + t * 5.0)
+            else:
+                resp = 0.75 * math.exp(-6.0 * (rel_x - cutoff_rel))
+        else:
+            cutoff_rel = filt_val * 0.85
+            if rel_x > cutoff_rel:
+                resp = 0.75 + 0.05 * math.sin(rel_x * 8.0 + t * 5.0)
+            else:
+                resp = 0.75 * math.exp(-6.0 * (cutoff_rel - rel_x))
+
+        py = int(by1 - 2 - resp * (h_box - 4))
+        pts.append((px, max(by0 + 2, min(by1 - 2, py))))
+
+    for i in range(len(pts) - 1):
+        d.line([pts[i], pts[i+1]], fill=255, width=1)
+        if i % 3 == 0:
+            top_y = pts[i][1]
+            for sy in range(top_y + 3, by1 - 1, 3):
+                d.point([(pts[i][0], sy)], fill=255)
+
+    # 3. Bi-polär filtermätare nederst (y=46..61)
+    d.text((4, 46), "LPF", font=F_XS, fill=255)
+    d.text((bx1 - text_w(d, "HPF", F_XS), 46), "HPF", font=F_XS, fill=255)
+
+    tl_y = 57
+    d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
+    center_x = (bx0 + bx1) // 2
+    d.line([(center_x, tl_y - 3), (center_x, tl_y + 3)], fill=255)
+
+    curr_x = int(center_x + filt_val * (bx1 - center_x))
+    curr_x = max(bx0, min(bx1, curr_x))
+    d.rectangle([curr_x - 2, tl_y - 3, curr_x + 2, tl_y + 3], fill=255)
+
+    # 4. Sidobar
+    dj_items = [
+        ("rot", "FILTER"),
+        ("top_tap", "DROP"),
+        ("top_hold", "BRAKE"),
+        ("btm_tap", "TAPE"),
+        ("btm_hold", "VOL"),
+    ]
+    draw_control_sidebar(d, dj_items)
 
 
 def render(t):
@@ -797,12 +884,15 @@ def render(t):
             d.text(((W - w) / 2, 14 + i * 18), line, font=F_MD, fill=255)
         return img, False
 
-    # --- OB-4 Speciallägen (TAPE & LOOP) -------------------------------------
+    # --- OB-4 & DJ Speciallägen (TAPE, LOOP & DJ) ----------------------------
     if s["mode"] == "TAPE":
         render_tape_view(d, s, t)
         return img, True
     elif s["mode"] == "LOOP":
         render_loop_view(d, s, t)
+        return img, True
+    elif s["mode"] == "DJ":
+        render_dj_view(d, s, t)
         return img, True
 
     if now < s["overlay_until"]:

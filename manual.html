@@ -586,11 +586,13 @@
         <span class="flow-step-badge highlight">1. VOL (Normalläge)</span>
         <span class="flow-arrow">──(Håll Next &gt;0,5s)──▶</span>
         <span class="flow-step-badge">2. TAPE (Magic Tape)</span>
-        <span class="flow-arrow">◀──(Klicka Next)──▶</span>
+        <span class="flow-arrow">◀──(Klicka)──▶</span>
         <span class="flow-step-badge">3. LOOP (Looper)</span>
+        <span class="flow-arrow">◀──(Klicka)──▶</span>
+        <span class="flow-step-badge">4. DJ (Filter & Brake)</span>
       </div>
       <div style="font-size:12.5px; color:var(--text-muted); margin-top:4px;">
-        💡 <strong>Tips:</strong> Håll in <strong>Next</strong> i &gt;0,5 sekunder från TAPE eller LOOP för att omedelbart återgå till standardläget (VOL). Musiken fortsätter alltid spela sömlöst framåt från exakt den punkt nålen befinner sig på!
+        💡 <strong>Tips:</strong> Håll in <strong>Next</strong> i &gt;0,5 sekunder från vilket läge som helst för att omedelbart återgå till standardläget (VOL). Musiken fortsätter alltid spela sömlöst framåt från exakt den punkt nålen befinner sig på!
       </div>
     </div>
 
@@ -749,12 +751,68 @@
             <tr>
               <td><span class="ctrl-key">Nedre knapp</span></td>
               <td>Kort tryck</td>
-              <td><span class="ctrl-action">Växla tillbaka till TAPE-läget</span></td>
+              <td><span class="ctrl-action">Växla till DJ-läget</span></td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Nedre knapp</span></td>
               <td>Håll intryckt (&gt;0,5 s)</td>
               <td><span class="ctrl-action">Återgå till VOL-läget</span><div class="ctrl-extra">Musiken fortsätter spela sömlöst framåt från loopen in i resten av låten!</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Läge 4: DJ -->
+      <div class="mode-detail-card">
+        <div class="mode-card-header">
+          <div class="mode-title-wrap">
+            <span class="mode-number">LÄGE 4</span>
+            <h3 class="mode-name">DJ — Color Filter & Turntable Tape Brake</h3>
+          </div>
+          <span class="mode-badge-oled">DJ</span>
+        </div>
+        <p class="mode-summary">
+          Ett kraftfullt DJ-verktyg för fest och häng. Vrid ratten för att svepa ett analogt resonant filter (LPF eller HPF), snäpp tillbaka med ett klick för episka beat drops, eller håll knappen för äkta skivbroms (Tape Stop)!
+        </p>
+
+        <table class="controls-table">
+          <thead>
+            <tr>
+              <th style="width:26%">Reglage</th>
+              <th style="width:28%">Handling</th>
+              <th>Vad som händer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="ctrl-key">Ratten (Vrid moturs)</span></td>
+              <td>Vrid moturs</td>
+              <td><span class="ctrl-action">Low-Pass Filter (LPF)</span><div class="ctrl-extra">Skär bort diskant och sång. Ljudet blir dovt och djupt som om du står i toakön utanför klubben!</div></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Ratten (Vrid medurs)</span></td>
+              <td>Vrid medurs</td>
+              <td><span class="ctrl-action">High-Pass Filter (HPF)</span><div class="ctrl-extra">Skär bort bas och kick — bygger upp enorm förväntan inför beat droppet!</div></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Övre knapp</span></td>
+              <td>Kort tryck</td>
+              <td><span class="highlight-action">BEAT DROP / CLEAN</span><div class="ctrl-extra">Snäpper omedelbart tillbaka filtret till 100 % rent ljud så basen exploderar tillbaka i rummet!</div></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Övre knapp</span></td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
+              <td><span class="highlight-action">TURNTABLE BRAKE (Tape Stop)</span><div class="ctrl-extra">Stänger av motorn! Musiken saktar in och stannar som en vinylspelare (wwwhhhoooom...). Släpp för att varva upp igen!</div></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Nedre knapp</span></td>
+              <td>Kort tryck</td>
+              <td><span class="ctrl-action">Växla tillbaka till TAPE-läget</span></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Nedre knapp</span></td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
+              <td><span class="ctrl-action">Återgå till VOL-läget</span></td>
             </tr>
           </tbody>
         </table>

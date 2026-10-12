@@ -10,12 +10,39 @@ Funktioner inspirerade av Teenage Engineering OB-4:
   5. Sömlös uppspelningskontinuitet (musiken fortsätter alltid från aktuell punkt utan hopp).
   6. Bergfast LIVE-lås och renodlad Play/Pause vid t-0.
 """
+import ctypes
 import math
 import os
+from pathlib import Path
 import threading
 import time
 from typing import Optional, Tuple
 import numpy as np
+
+# --------------------------------------------------------------------------- #
+# C-baserat Cytomic Resonant State Variable Filter (SVF) för DJ Mode
+# --------------------------------------------------------------------------- #
+_libdsp = None
+class _SVFState(ctypes.Structure):
+    _fields_ = [("ic1eq", ctypes.c_float * 2), ("ic2eq", ctypes.c_float * 2)]
+
+for dsp_candidate in [
+    Path(__file__).with_name("libdsp.so"),
+    Path("/home/pyken/streamer/libdsp.so"),
+    Path("/tmp/libdsp.so"),
+]:
+    if dsp_candidate.exists():
+        try:
+            _libdsp = ctypes.CDLL(str(dsp_candidate))
+            _libdsp.svf_filter_block.argtypes = [
+                ctypes.POINTER(_SVFState),
+                ctypes.POINTER(ctypes.c_float),
+                ctypes.c_int,
+                ctypes.c_float
+            ]
+            break
+        except Exception:
+            pass
 
 # --------------------------------------------------------------------------- #
 # Konstanter & Standardvärden
@@ -101,6 +128,7 @@ class TapeEngine:
     MODE_VOL = "VOL"          # Standard: Encodern styr volym, sömlös uppspelning från nålen
     MODE_TAPE = "TAPE"        # OB-4 Vinyl: 1:1 slipmat scratch, Super Spool & LIVE (t-0)
     MODE_LOOP = "LOOP"        # Instant Looper: Framåt expansion & glidande tidsfönster
+    MODE_DJ = "DJ"            # DJ Mixer: Resonant Bi-polar DJ Filter & Turntable Brake
 
     LOOP_PRESETS = [0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]
 
@@ -139,6 +167,11 @@ class TapeEngine:
         self.loop_edit_mode = "SIZE"    # "SIZE" (ändra längd framåt) eller "MOVE" (flytta loopen)
         self._loop_accum = 0
 
+        # DJ Filter & Turntable Brake state
+        self.dj_filter_val = 0.0        # -1.0 (LPF) .. 0.0 (Clean) .. +1.0 (HPF)
+        self.dj_brake_active = False    # Sant när skivbromsen hålls nere
+        self.dj_svf_state = _SVFState()
+
         self._lock = threading.Lock()
 
     # ----------------------------------------------------------------------- #
@@ -155,10 +188,12 @@ class TapeEngine:
                 # Återgång till VOL: fortsätt spela sömlöst från exakt där nålen befinner sig!
                 self.speed = 1.0
                 self._pending_tape_steps = 0
+                self.dj_brake_active = False
 
             elif new_mode == self.MODE_TAPE:
                 # Gå in i TAPE: behåll nålen exakt på låten där den spelar
                 self._pending_tape_steps = 0
+                self.dj_brake_active = False
 
             elif new_mode == self.MODE_LOOP:
                 # Fånga slinga från nuvarande uppspelningsposition
@@ -169,13 +204,45 @@ class TapeEngine:
                 self.loop_end_pos = self.head_pos
                 self.loop_edit_mode = "SIZE"
                 self._loop_accum = 0
+                self.dj_brake_active = False
+
+            elif new_mode == self.MODE_DJ:
+                # Gå in i DJ: nollställ broms, fortsätt spela sömlöst
+                self.dj_brake_active = False
+                self._pending_tape_steps = 0
 
     def cycle_mode(self) -> str:
-        """Växlar mellan de två kreativa OB-4-lägena: TAPE <-> LOOP."""
+        """Växlar i cirkel mellan de tre kreativa lägena: TAPE -> LOOP -> DJ -> TAPE."""
         with self._lock:
-            nxt = self.MODE_LOOP if self.mode == self.MODE_TAPE else self.MODE_TAPE
+            if self.mode == self.MODE_TAPE:
+                nxt = self.MODE_LOOP
+            elif self.mode == self.MODE_LOOP:
+                nxt = self.MODE_DJ
+            else:
+                nxt = self.MODE_TAPE
         self.set_mode(nxt)
         return nxt
+
+    def set_dj_filter(self, val: float):
+        """Sätt DJ-filtrets läge (-1.0 = Max LPF, 0.0 = Clean Bypass, +1.0 = Max HPF)."""
+        with self._lock:
+            self.dj_filter_val = float(np.clip(val, -1.0, 1.0))
+            if abs(self.dj_filter_val) < 0.03:
+                self.dj_filter_val = 0.0
+
+    def reset_dj_filter(self):
+        """Omedelbart snitt till Clean neutral (perfekt för beat drop!)."""
+        with self._lock:
+            self.dj_filter_val = 0.0
+
+    def trigger_dj_brake(self, active: Optional[bool] = None) -> bool:
+        """Slå på/av skivbroms (turntable motor stop)."""
+        with self._lock:
+            if active is None:
+                self.dj_brake_active = not self.dj_brake_active
+            else:
+                self.dj_brake_active = bool(active)
+            return self.dj_brake_active
 
     def toggle_loop_edit_mode(self) -> str:
         """Växlar encoderns funktion i LOOP-läge mellan SIZE (längd) och MOVE (flytta fönster)."""
@@ -266,6 +333,12 @@ class TapeEngine:
                         self.loop_start_pos = new_start
                         self.loop_end_pos = new_end
                         self.head_pos = (self.head_pos + shift) % self.tape.max_frames
+
+            elif self.mode == self.MODE_DJ:
+                # Ratten styr bi-polärt DJ-filter (-1.0 LPF .. 0.0 Clean .. +1.0 HPF)
+                self.dj_filter_val = float(np.clip(self.dj_filter_val + steps * 0.015, -1.0, 1.0))
+                if abs(self.dj_filter_val) < 0.03:
+                    self.dj_filter_val = 0.0
 
     def get_loop_progress(self) -> float:
         """Exakt fasindikator (0.0 till 1.0) för synkad skärmanimering."""
@@ -539,6 +612,34 @@ class TapeEngine:
                         fade_in = np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
                         out[wrap_idx:wrap_idx + fade_len] *= fade_in
 
+                return out
+
+            # --- MODE_DJ: Resonant DJ Filter & Turntable Brake ---
+            elif self.mode == self.MODE_DJ:
+                if self.dj_brake_active:
+                    # Turntable brake / motor stop: mjuk motoravstängning
+                    self.is_live = False
+                    self.speed = max(0.0, self.speed - 0.035)
+                else:
+                    # Normal uppspelning eller motor spin-up tillbaka till 1.0
+                    if self.speed < 1.0:
+                        self.speed = min(1.0, self.speed + 0.06)
+
+                if self.is_live and self.speed >= 0.99:
+                    pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+                    out = self.tape.read_interp(pos)
+                else:
+                    step_frames = frames_needed * self.speed
+                    pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                    self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
+                    out = self.tape.read_interp(pos)
+
+                # Applicera Cytomic resonant DJ State Variable Filter
+                if _libdsp is not None and abs(self.dj_filter_val) >= 0.02:
+                    out = np.ascontiguousarray(out, dtype=np.float32)
+                    ptr = out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                    _libdsp.svf_filter_block(ctypes.byref(self.dj_svf_state), ptr, frames_needed, ctypes.c_float(self.dj_filter_val))
                 return out
 
             return np.zeros((frames_needed, CHANNELS), dtype=np.float32)

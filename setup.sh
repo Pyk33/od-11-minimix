@@ -141,6 +141,9 @@ python3 -m venv venv
 ./venv/bin/pip install --upgrade pip
 ./venv/bin/pip install -r requirements.txt
 
+echo "=== 6.5. Kompilera Cytomic DJ Filter (libdsp.so) ==="
+gcc -O3 -shared -fPIC dsp_filter.c -o libdsp.so -lm
+
 echo "=== 7. streamer.service ==="
 sed -e "s|^User=.*|User=${RUN_USER}|" \
     -e "s|^WorkingDirectory=.*|WorkingDirectory=${PROJECT_DIR}|" \
