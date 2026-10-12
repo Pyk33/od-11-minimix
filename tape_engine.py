@@ -173,6 +173,18 @@ class TapeEngine:
         self.dj_svf_state = _SVFState()
         self._smooth_behind_sec = 0.0
 
+        # Auto DJ Smart Crossfade Transition state
+        self.is_dj_transition = False
+        self.dj_trans_duration_s = 5.0
+        self.dj_trans_frames = int(5.0 * sample_rate)
+        self.dj_trans_pos = 0
+        self.dj_trans_progress = 0.0
+        self.dj_trans_track1_head = 0.0
+        self.dj_trans_t1_start = 0.0
+        self.dj_trans_t1_len = int(2.5 * sample_rate)
+        self.dj_trans_svf_t1 = _SVFState()
+        self.dj_trans_svf_t2 = _SVFState()
+
         self._lock = threading.Lock()
 
     # ----------------------------------------------------------------------- #
@@ -184,6 +196,9 @@ class TapeEngine:
                 return
             old_mode = self.mode
             self.mode = new_mode
+
+            if new_mode != self.MODE_DJ:
+                self.is_dj_transition = False
 
             if new_mode == self.MODE_VOL:
                 # Återgång till VOL: fortsätt spela sömlöst från exakt där nålen befinner sig!
@@ -246,6 +261,33 @@ class TapeEngine:
             else:
                 self.dj_brake_active = bool(active)
             return self.dj_brake_active
+
+    def start_dj_transition(self, duration_s: float = 5.0):
+        """Startar en automatisk DJ Smart Crossfade-övergång till nästa låt."""
+        with self._lock:
+            self.is_dj_transition = True
+            self.dj_trans_duration_s = duration_s
+            self.dj_trans_frames = int(duration_s * self.sr)
+            self.dj_trans_pos = 0
+            self.dj_trans_progress = 0.0
+            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+            self.dj_trans_t1_len = int(2.5 * self.sr)
+            self.dj_trans_t1_start = (live_edge - self.dj_trans_t1_len) % self.tape.max_frames
+            self.dj_trans_track1_head = self.dj_trans_t1_start
+            self.dj_trans_svf_t1 = _SVFState()
+            self.dj_trans_svf_t2 = _SVFState()
+            self.dj_brake_active = False
+
+    def end_dj_transition(self):
+        """Avslutar övergången omedelbart och låser till nutid."""
+        with self._lock:
+            self.is_dj_transition = False
+            self.dj_trans_progress = 1.0
+            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+            self.head_pos = live_edge
+            self.is_live = True
+            self.speed = 1.0
+            self.dj_filter_val = 0.0
 
     def toggle_loop_edit_mode(self) -> str:
         """Växlar encoderns funktion i LOOP-läge mellan SIZE (längd) och MOVE (flytta fönster)."""
@@ -338,6 +380,8 @@ class TapeEngine:
                         self.head_pos = (self.head_pos + shift) % self.tape.max_frames
 
             elif self.mode == self.MODE_DJ:
+                if self.is_dj_transition:
+                    return
                 # Ratten styr bi-polärt DJ-filter (-1.0 LPF .. 0.0 Clean .. +1.0 HPF)
                 # Anpassad för stor rotor: ca 400 steg för fullt svep från neutral till max
                 old_val = self.dj_filter_val
@@ -632,8 +676,65 @@ class TapeEngine:
 
                 return out
 
-            # --- MODE_DJ: Resonant DJ Filter & Turntable Brake ---
+            # --- MODE_DJ: Resonant DJ Filter, Turntable Brake & Auto Smart Crossfade ---
             elif self.mode == self.MODE_DJ:
+                if self.is_dj_transition:
+                    p = self.dj_trans_pos / float(max(1, self.dj_trans_frames))
+                    self.dj_trans_progress = min(1.0, p)
+
+                    # 1. Track 1 (Utgående låt från bandbufferten): Loop-roll + LPF sveper neråt + fade out
+                    loop_frames = max(256, self.dj_trans_t1_len)
+                    rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % loop_frames
+                    pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % loop_frames) % self.tape.max_frames
+                    self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % loop_frames) % self.tape.max_frames
+                    audio_t1 = self.tape.read_interp(pos_t1)
+
+                    wrap_idx = int(loop_frames - rel)
+                    if 0 <= wrap_idx < frames_needed:
+                        fade_len = min(256, frames_needed - wrap_idx)
+                        if fade_len > 0:
+                            fade_in = np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
+                            audio_t1[wrap_idx:wrap_idx + fade_len] *= fade_in
+
+                    f1 = float(np.clip(-0.15 - 0.75 * p, -1.0, 1.0))
+                    g1 = float(np.cos(p * np.pi * 0.5))
+
+                    if _libdsp is not None:
+                        audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
+                        ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f1))
+
+                    audio_t1 *= g1
+
+                    # 2. Track 2 (Inkommande låt från realtidsströmmen): HPF sveper ned till neutralt + fade in
+                    pos_t2 = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
+                    audio_t2 = self.tape.read_interp(pos_t2)
+
+                    f2 = float(np.clip(0.85 * (1.0 - p), -1.0, 1.0))
+                    g2 = float(np.sin(p * np.pi * 0.5))
+
+                    if _libdsp is not None and f2 >= 0.005:
+                        audio_t2 = np.ascontiguousarray(audio_t2, dtype=np.float32)
+                        ptr2 = audio_t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t2), ptr2, frames_needed, ctypes.c_float(f2))
+
+                    audio_t2 *= g2
+
+                    # 3. Summering av båda spåren
+                    out = audio_t1 + audio_t2
+
+                    self.head_pos = live_edge
+                    self.dj_trans_pos += frames_needed
+                    if self.dj_trans_pos >= self.dj_trans_frames:
+                        # Övergången är klar! Lås sömlöst till Track 2 vid nutid
+                        self.is_dj_transition = False
+                        self.is_live = True
+                        self.head_pos = live_edge
+                        self.speed = 1.0
+                        self.dj_filter_val = 0.0
+
+                    return out
+
                 if self.dj_brake_active:
                     # Turntable brake / motor stop: mjuk motoravstängning
                     self.is_live = False

@@ -95,7 +95,7 @@ Ett kraftfullt och festanpassat DJ-verktyg utformat för att bygga upp stämning
   - Nederst: Bi-polär filtermätare med mittpunkt vid neutralt (`CLEAN`).
 - **Höger kommandokolumn (sidebar):**
   - `◎ FILTER`: Bi-polärt DJ-filter (vrid vänster för LPF / vrid höger för HPF).
-  - `▲ DROP`: Kort tryck på övre knappen snäpper omedelbart tillbaka till `CLEAN` (perfekt för beat drop!).
+  - `▲ XFADE`: Kort tryck på övre knappen aktiverar **Auto DJ Smart Crossfade (5 sekunder)**! Utgående låt loopas och sveps ner med LPF (dämpad club-bas) medan nästa låt startar samtidigt och sveps in med HPF (krispig diskant/melodi utan baskollision), följt av sömlös handoff till LIVE!
   - `↳ BRAKE`: Håll övre knappen för **Turntable Brake / Tape Stop** (musiken saktar in och stannar som en vinylspelare vars motor stängts av!).
   - `▼ TAPE`: Kort tryck på nedre knappen växlar till `TAPE`.
   - `↳ VOL`: Håll nedre knappen för att återgå till standard volymläge.
@@ -103,8 +103,8 @@ Ett kraftfullt och festanpassat DJ-verktyg utformat för att bygga upp stämning
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
 | **Rotary Encoder (Vrid vänster)** | Vrid | **Low-Pass Filter (LPF):** Skär bort diskant och sång. Ljudet blir djupt och mörkt som om du står i toalettkön utanför klubben! |
-| **Rotary Encoder (Vrid höger)** | Vrid | **High-Pass Filter (HPF):** Skär bort bas och kick för att bygga upp maximal förväntan inför ett drop! |
-| **Övre knapp (`IO22`)** | Klick | **BEAT DROP / CLEAN:** Snäpper filtret direkt till neutralt (0 %) på ett klick så hela ljudet exploderar tillbaka i rummet! |
+| **Rotary Encoder (Vrid höger)** | Vrid | **High-Pass Filter (HPF):** Skär bort bas och kick för att bygga upp maximal förväntan! |
+| **Övre knapp (`IO22`)** | Klick | **SMART CROSSFADE (XFADE):** 5-sekunders professionell DJ-övergång till nästa låt! Utgående låt loopar och filtreras med LPF samtidigt som nästa låt sveps in med HPF. Ingen basgröt, perfekt klubbkänsla! Klicka igen för att avbryta/snäppa till nutid. |
 | | Håll (>0.5 s) | **TURNTABLE BRAKE (Tape Stop):** Skivspelarens motor stängs av och musiken saktar in till ett stopp (*wwwhhhoooom*). Släpp för att varva upp igen! |
 | **Nedre knapp (`IO23`)** | Klick | Växla vidare till **`TAPE` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode**. |
