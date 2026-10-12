@@ -269,29 +269,29 @@ class TapeEngine:
                 self.loop_active = False
 
             elif new_mode == self.MODE_LOOP:
-                # Fånga slinga från nuvarande uppspelningsposition med naturlig takt/beat-detektering
-                self.loop_active = True
+                # Gå in i LOOP: standby/armed, spela sömlöst vidare utan avbrott
+                self.loop_active = False
                 self.tape_stop_active = False
                 self.dj_brake_active = False
                 self.loop_edit_mode = "SIZE"
                 self._loop_accum = 0
 
-                anchor = int(self.head_pos)
-                loop_start, bar_len, bpm = self._detect_natural_loop(anchor)
-                self.loop_bpm = bpm
-                self.loop_beat_frames = max(int(0.20 * self.sr), int(bar_len // 4))
-                self.loop_bar_frames = 4 * self.loop_beat_frames
-
                 # Standard: 1 BAR (4 beats)
                 self.loop_preset_idx = 4
                 self.loop_beats = 4.0
                 self.loop_name = "1 BAR"
+
+                anchor = int(self.head_pos if not self.is_live else live_edge)
+                loop_start, bar_len, bpm = self._detect_natural_loop(anchor)
+                self.loop_bpm = bpm
+                self.loop_beat_frames = max(int(0.20 * self.sr), int(bar_len // 4))
+                self.loop_bar_frames = 4 * self.loop_beat_frames
                 self.loop_frames = self.loop_bar_frames
                 self.loop_length_s = self.loop_frames / float(self.sr)
 
                 self.loop_start_pos = loop_start
                 self.loop_end_pos = (loop_start + self.loop_frames) % self.tape.max_frames
-                self.head_pos = self.loop_start_pos
+                # Behåll self.head_pos oförändrad så musiken fortsätter rulla på utan avbrott!
 
             elif new_mode == self.MODE_DJ:
                 # Gå in i DJ: nollställ broms, fortsätt spela sömlöst
@@ -469,10 +469,45 @@ class TapeEngine:
             self.is_live = True
             self.speed = 1.0
 
-    def toggle_loop_edit_mode(self) -> str:
-        """Växlar encoderns funktion i LOOP-läge mellan SIZE (längd) och MOVE (flytta fönster)."""
+    def _activate_loop_unlocked(self):
+        """Intern metod för att aktivera loopen (anropas med self._lock hållen)."""
+        if self.loop_active:
+            return
+        live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+        anchor = int(self.head_pos if not self.is_live else live_edge)
+        loop_start, bar_len, bpm = self._detect_natural_loop(anchor)
+        self.loop_bpm = bpm
+        self.loop_beat_frames = max(int(0.20 * self.sr), int(bar_len // 4))
+        self.loop_bar_frames = 4 * self.loop_beat_frames
+
+        beats, label = self.LOOP_BEAT_PRESETS[self.loop_preset_idx]
+        self.loop_beats = beats
+        self.loop_name = label
+        self.loop_frames = max(256, int(beats * self.loop_beat_frames))
+        self.loop_length_s = self.loop_frames / float(self.sr)
+
+        self.loop_start_pos = loop_start
+        self.loop_end_pos = (loop_start + self.loop_frames) % self.tape.max_frames
+
+        # Fäst head_pos faslåst inom loopen utan något hörbart hopp
+        rel = (anchor - loop_start) % self.loop_frames
+        self.head_pos = (self.loop_start_pos + rel) % self.tape.max_frames
+        self.loop_active = True
+        self.is_live = False
+        self._loop_accum = 0
+
+    def activate_loop(self):
+        """Aktiverar loopen och låser musiken till den valda takten."""
         with self._lock:
-            self.loop_edit_mode = "MOVE" if self.loop_edit_mode == "SIZE" else "SIZE"
+            self._activate_loop_unlocked()
+
+    def toggle_loop_edit_mode(self) -> str:
+        """Växlar encoderns funktion i LOOP-läge mellan SIZE (längd) och MOVE (flytta fönster), eller aktiverar loopen om den är i standby."""
+        with self._lock:
+            if not self.loop_active:
+                self._activate_loop_unlocked()
+            else:
+                self.loop_edit_mode = "MOVE" if self.loop_edit_mode == "SIZE" else "SIZE"
             return self.loop_edit_mode
 
     def get_merge_progress(self) -> float:
@@ -529,6 +564,9 @@ class TapeEngine:
                 self.last_touch_time = now
 
             elif self.mode == self.MODE_LOOP:
+                if not self.loop_active:
+                    self._activate_loop_unlocked()
+
                 if self.loop_edit_mode == "SIZE":
                     # Ändra looplängd i musikaliska beats och takter (1/4 BEAT .. 8 BARS)
                     self._loop_accum += steps
@@ -913,6 +951,28 @@ class TapeEngine:
 
             # --- MODE_LOOP: Instant looper med framåtriktad expansion ---
             elif self.mode == self.MODE_LOOP:
+                if not self.loop_active:
+                    # Loopen är i standby: spela sömlöst vidare utan minsta avbrott
+                    if self.is_live:
+                        pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                        self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+
+                        dist = (live_edge - self.head_pos) % self.tape.max_frames
+                        if dist > self.tape.max_frames / 2:
+                            dist -= self.tape.max_frames
+                        if abs(dist) > int(0.5 * self.sr):
+                            self.head_pos = live_edge
+                        elif abs(dist) > 150:
+                            nudge = np.clip(dist * 0.005, -1.5, 1.5)
+                            self.head_pos = (self.head_pos + nudge) % self.tape.max_frames
+
+                        return self.tape.read_interp(pos)
+                    else:
+                        step_frames = frames_needed * self.speed
+                        pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                        self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
+                        return self.tape.read_interp(pos)
+
                 self.is_live = False
                 loop_len = int(self.loop_length_s * self.sr)
                 if loop_len < 256:

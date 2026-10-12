@@ -466,7 +466,7 @@ def on_btn_play_long():
         touch()
     elif m == "LOOP":
         if tape:
-            tape.start_dj_transition(from_loop=True)
+            tape.start_dj_transition(from_loop=getattr(tape, "loop_active", False))
             with lock:
                 state["mode"] = "DJ"
             do_dj_next(seek_s=18.0)
@@ -802,6 +802,7 @@ def render_tape_view(d, s, t):
 
 
 def render_loop_view(d, s, t):
+    loop_active = getattr(tape, "loop_active", False) if tape else False
     loop_sec = tape.loop_length_s if tape else 2.0
     edit_mode = getattr(tape, "loop_edit_mode", "SIZE") if tape else "SIZE"
     loop_name = tape.get_loop_label() if (tape and hasattr(tape, "get_loop_label")) else (
@@ -814,82 +815,100 @@ def render_loop_view(d, s, t):
         getattr(tape, "loop_beats", 4.0) if tape else 4.0
     )
 
-    # Header: LOOP märke till vänster, BÅDE [SIZE] och MOVE tydligt indikerade till höger
+    # Header: LOOP märke till vänster, status eller edit mode till höger
     d.rectangle([0, 0, 22, 9], fill=255)
     d.text((2, 0), "LOOP", font=F_XS, fill=0)
 
-    # Visar båda lägena med klamrar runt det aktiva läget så användaren vet vad som är valt
-    tag = "[SIZE] MOVE" if edit_mode == "SIZE" else "SIZE [MOVE]"
+    if not loop_active:
+        tag = "[ARMED]"
+    else:
+        tag = "[SIZE] MOVE" if edit_mode == "SIZE" else "SIZE [MOVE]"
     d.text((W_MAIN - text_w(d, tag, F_XS) - 2, 0), tag, font=F_XS, fill=255)
     d.line([(0, 10), (W_MAIN, 10)], fill=255)
 
-    # 1. Zoomad loop-box med faslåst playhead i perfekt synk med ljudet
+    # 1. Zoomad loop-box
     box_x0, box_y0, box_x1, box_y1 = 4, 14, 80, 31
     d.rectangle([box_x0, box_y0, box_x1, box_y1], outline=255)
 
-    frac = tape.get_loop_progress() if tape else 0.0
-    head_x = box_x0 + frac * (box_x1 - box_x0)
-    d.line([(head_x, box_y0 + 2), (head_x, box_y1 - 2)], fill=255, width=2)
+    if not loop_active:
+        prompt_txt = "TURN TO LOOP"
+        pt_w = text_w(d, prompt_txt, F_XS)
+        pt_x = box_x0 + (box_x1 - box_x0 - pt_w) // 2
+        d.text((pt_x, box_y0 + 5), prompt_txt, font=F_XS, fill=255)
+    else:
+        frac = tape.get_loop_progress() if tape else 0.0
+        head_x = box_x0 + frac * (box_x1 - box_x0)
+        d.line([(head_x, box_y0 + 2), (head_x, box_y1 - 2)], fill=255, width=2)
 
-    # Taktindelningar (beats) inne i loop-boxen
-    num_subdiv = int(loop_beats) if (1 < loop_beats <= 8) else 4
-    for seg in range(1, num_subdiv):
-        sx = box_x0 + seg * (box_x1 - box_x0) / float(num_subdiv)
-        d.line([(sx, box_y1 - 3), (sx, box_y1 - 1)], fill=255)
+        # Taktindelningar (beats) inne i loop-boxen
+        num_subdiv = int(loop_beats) if (1 < loop_beats <= 8) else 4
+        for seg in range(1, num_subdiv):
+            sx = box_x0 + seg * (box_x1 - box_x0) / float(num_subdiv)
+            d.line([(sx, box_y1 - 3), (sx, box_y1 - 1)], fill=255)
 
     # 2. Text under loopen: Taktlängd och BPM
     info_str = f"{loop_name}  {int(round(loop_bpm))}BPM"
     d.text((4, 34), info_str, font=F_XS, fill=255)
 
-    # 3. Låtens tidslinje (Timeline) med loopen som ett intervall/box på tidslinjen
-    behind_sec = tape.get_loop_behind_live_sec() if (tape and hasattr(tape, "get_loop_behind_live_sec")) else (
-        tape.get_time_behind_live_sec() if tape else 0.0
-    )
-
-    dur_ms = s.get("loop_anchor_dur_ms", 0)
-    if dur_ms <= 0:
-        dur_ms = s.get("dur_ms", 0)
-
-    anchor_live_ms = s.get("loop_anchor_live_song_ms", 0)
-    if anchor_live_ms <= 0 and s["dur_ms"] > 0:
-        now = time.monotonic()
-        anchor_live_ms = s["pos_ms"] + ((now - s["stamp"]) * 1000 if s["playing"] else 0)
-
-    if dur_ms > 0:
-        loop_start_ms = max(0, anchor_live_ms - behind_sec * 1000)
-        loop_end_ms = min(dur_ms, loop_start_ms + loop_sec * 1000)
-        start_frac = max(0.0, min(1.0, loop_start_ms / dur_ms))
-        end_frac = max(0.0, min(1.0, loop_end_ms / dur_ms))
-    else:
-        # Fallback (AirPlay / radio utan spårlängd): tidslinje över senaste 60s buffert
-        window_s = 60.0
-        start_frac = max(0.0, min(1.0, 1.0 - (behind_sec + loop_sec) / window_s))
-        end_frac = max(0.0, min(1.0, 1.0 - behind_sec / window_s))
-
+    # 3. Låtens tidslinje (Timeline)
     tl_x0, tl_x1 = 4, 80
     tl_y = 52
-
-    # Tidslinjens spår med ändmarkörer
     d.line([(tl_x0, tl_y), (tl_x1, tl_y)], fill=255)
     d.line([(tl_x0, tl_y - 2), (tl_x0, tl_y + 2)], fill=255)
     d.line([(tl_x1, tl_y - 2), (tl_x1, tl_y + 2)], fill=255)
 
-    # Loopens intervallbox på tidslinjen
-    lx0 = int(tl_x0 + start_frac * (tl_x1 - tl_x0))
-    lx1 = int(tl_x0 + end_frac * (tl_x1 - tl_x0))
-    if lx1 - lx0 < 6:
-        lx1 = min(tl_x1, lx0 + 6)
-    if lx1 - lx0 < 6:
-        lx0 = max(tl_x0, lx1 - 6)
+    dur_ms = s.get("dur_ms", 0)
+    pos_ms = s.get("pos_ms", 0)
 
-    # Solid box med inre inverterad playhead
-    d.rectangle([lx0, tl_y - 4, lx1, tl_y + 4], fill=255)
-    in_x = lx0 + int(frac * (lx1 - lx0))
-    d.line([(in_x, tl_y - 3), (in_x, tl_y + 3)], fill=0)
+    if not loop_active:
+        behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
+        if dur_ms > 0:
+            now = time.monotonic()
+            curr_pos_ms = pos_ms + ((now - s["stamp"]) * 1000 if s["playing"] else 0) - (behind_sec * 1000)
+            song_frac = max(0.0, min(1.0, curr_pos_ms / dur_ms))
+        else:
+            song_frac = max(0.0, min(1.0, 1.0 - behind_sec / 60.0))
+
+        px = int(tl_x0 + song_frac * (tl_x1 - tl_x0))
+        d.rectangle([px - 2, tl_y - 4, px + 2, tl_y + 4], fill=255)
+    else:
+        behind_sec = tape.get_loop_behind_live_sec() if (tape and hasattr(tape, "get_loop_behind_live_sec")) else (
+            tape.get_time_behind_live_sec() if tape else 0.0
+        )
+        anchor_dur = s.get("loop_anchor_dur_ms", 0)
+        if anchor_dur <= 0:
+            anchor_dur = dur_ms
+
+        anchor_live_ms = s.get("loop_anchor_live_song_ms", 0)
+        if anchor_live_ms <= 0 and dur_ms > 0:
+            now = time.monotonic()
+            anchor_live_ms = pos_ms + ((now - s["stamp"]) * 1000 if s["playing"] else 0)
+
+        if anchor_dur > 0:
+            loop_start_ms = max(0, anchor_live_ms - behind_sec * 1000)
+            loop_end_ms = min(anchor_dur, loop_start_ms + loop_sec * 1000)
+            start_frac = max(0.0, min(1.0, loop_start_ms / anchor_dur))
+            end_frac = max(0.0, min(1.0, loop_end_ms / anchor_dur))
+        else:
+            window_s = 60.0
+            start_frac = max(0.0, min(1.0, 1.0 - (behind_sec + loop_sec) / window_s))
+            end_frac = max(0.0, min(1.0, 1.0 - behind_sec / window_s))
+
+        lx0 = int(tl_x0 + start_frac * (tl_x1 - tl_x0))
+        lx1 = int(tl_x0 + end_frac * (tl_x1 - tl_x0))
+        if lx1 - lx0 < 6:
+            lx1 = min(tl_x1, lx0 + 6)
+        if lx1 - lx0 < 6:
+            lx0 = max(tl_x0, lx1 - 6)
+
+        d.rectangle([lx0, tl_y - 4, lx1, tl_y + 4], fill=255)
+        frac = tape.get_loop_progress() if tape else 0.0
+        in_x = lx0 + int(frac * (lx1 - lx0))
+        d.line([(in_x, tl_y - 3), (in_x, tl_y + 3)], fill=0)
 
     loop_items = [
-        ("rot", edit_mode),
-        ("top_tap", "SWAP"),
+        ("rot", "LOOP" if not loop_active else edit_mode),
+        ("top_tap", "START" if not loop_active else "SWAP"),
         ("top_hold", "XFADE"),
         ("btm_tap", "DJ"),
         ("btm_hold", "VOL"),
