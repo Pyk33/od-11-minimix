@@ -1,74 +1,66 @@
-# Olle's Mini-Mix – OB-4 Magic Tape, Looper & Disk Mode
+# Olle's Mini-Mix – OB-4 Magic Tape & Looper
 
-Inspirerad av Teenage Engineerings ikoniska **OB-4 "Magic Radio"** är Olle's Mini-Mix utrustad med en kontinuerlig rullande bandbuffert i minnet och realtids-DSP som gör det möjligt att spola i realtidsljud, loopa och skapa eteriska drönarlandskap.
+Inspirerad av Teenage Engineerings ikoniska **OB-4 "Magic Radio"** är Olle's Mini-Mix utrustad med en kontinuerlig 15-minuters rullande bandbuffert i minnet och realtids-DSP som gör det möjligt att spola i realtidsljud, loopa och sömlöst fortsätta lyssna.
 
 ---
 
 ## 🎛️ Lägen & Kontroller
 
-Mini-Mix har fyra driftslägen. Du växlar mellan dem med knapparna och encodern:
+Mini-Mix har tre rena driftslägen:
+- **`VOL`**: Normal lyssning med volymkontroll.
+- **`TAPE`**: 1:1 vinyl slipmat scratch, spolning och snabb framåtspolning till LIVE (t-0).
+- **`LOOP`**: Instant looper med framåtriktad tidsförlängning och flyttbart loopfönster.
 
 ```
-[ VOL ] ──(Håll Next)──> [ TAPE ] ──(Klicka Next)──> [ LOOP ] ──(Klicka Next)──> [ AMBIENT ] ──(Klicka Next)──> [ VOL ]
+[ VOL ] ──(Håll Next >0.5s)──> [ TAPE ] ──(Klicka Next)──> [ LOOP ]
+   ▲                              │                           │
+   └────────(Håll Next >0.5s)─────┴───────────────────────────┘
 ```
 
 ---
 
-### 1. `VOL` (Standardläge / Live)
+### 1. `VOL` (Standardläge / Normal Lyssning)
 Normal uppspelning från Spotify Connect eller AirPlay.
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
 | **Rotary Encoder** | Vrid medurs / moturs | Höj / sänk volym (0–85 %). Stor TE-volymoverlay visas på skärmen. |
 | **Play/Pause (`IO22`)** | Klick | Play / Pause (Spotify / AirPlay). |
-| | Håll (0,7 s) | Mute / Unmute. |
-| **Next (`IO23`)** | Klick | Nästa spår. |
-| | Håll (0,7 s) | **Växla till `TAPE` Mode!** |
+| | Håll (>0.5 s) | Mute / Unmute (eller hoppa till LIVE om du lyssnar med bandfördröjning). |
+| **Next (`IO23`)** | Klick | Nästa låt (Spotify / AirPlay). |
+| | Håll (>0.5 s) | **Gå in i OB-4 `TAPE` Mode!** |
 
 ---
 
-### 2. `TAPE` (OB-4 Magic Tape: Scrub & Rewind)
-En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz stereo. I detta läge kan du spola bakåt och framåt i tiden med autentisk pitch/bandretardation och mekanisk tröghet.
+### 2. `TAPE` (OB-4 Magic Tape: Scrub, Rewind & Spool till LIVE)
+En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz stereo. I detta läge kan du spola bakåt och framåt i tiden med autentisk 1:1 slipmat-känsla och mekanisk tröghet.
 
-- **Display:** Visar två animerade rullbandshjul som snurrar i takt med bandhastigheten, tidsskillnad mot live (`-00:24` eller `LIVE`), och bandhuvud.
+- **Display:** Visar två animerade rullbandshjul som snurrar i takt med bandhastigheten, tidsskillnad mot live (`LIVE` eller `-MM:SS`), och bandhuvud.
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
-| **Rotary Encoder** | Vrid moturs | **Spola bakåt i tiden!** (Tape scratch / rewind). |
-| | Vrid medurs | **Spola framåt** mot realtidsströmmen. |
-| **Play/Pause (`IO22`)** | Klick | **Tape Stop / Resume**: Simulerar motorstopp på rullband/vinyl. |
-| | Håll (0,7 s) | **JUMP TO LIVE!** Hoppar omedelbart fram till realtidsströmmen och återgår till `VOL`. |
+| **Rotary Encoder** | Vrid moturs | **Scratcha bakåt i musikhistorien!** (Autentisk vinyl/band-retardation). |
+| | Vrid medurs | **Spola framåt mot LIVE:** Snabb vridning accelererar spolningen så du når LIVE t-0 med ett snabbt knyck. Spärras bergfast vid LIVE (t-0) utan att hoppa förbi. |
+| **Play/Pause (`IO22`)** | Klick | **1-KLICK JUMP TO LIVE (t-0):** Om du ligger bakom nutid hoppar du omedelbart fram till realtidsströmmen! Om du redan är vid LIVE pausas/startas motorn (Tape Stop). |
+| | Håll (>0.5 s) | **JUMP TO LIVE!** Hoppar omedelbart fram till realtidsströmmen. |
 | **Next (`IO23`)** | Klick | Växla till **`LOOP` Mode**. |
-| | Håll (0,7 s) | Återgå till `VOL` Mode. |
+| | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Låten fortsätter spela sömlöst framåt från exakt den punkt nålen befinner sig på! |
 
 ---
 
-### 3. `LOOP` (Instant Looper & Glitch Stutter)
+### 3. `LOOP` (Instant Looper: Framåt-expansion & Glidande Fönster)
 Fångar omedelbart en slinga av musiken och upprepar den med klickfria equal-power crossfades.
 
-- **Display:** Visar aktiv slinga, looplängd i sekunder samt en pulserande loopbox med rörligt playhead i realtid.
+- **Display:** Visar aktiv slinga, looplängd i sekunder, aktivt rattläge (`[SIZE] MOVE` eller `SIZE [MOVE]`), samt en faslåst loopindikator som rör sig i perfekt takt med takten i högtalaren.
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
-| **Rotary Encoder** | Vrid medurs / moturs | **Ändra looplängd:** Stega mellan 16 s, 8 s, 4 s, 2 s, 1 s, 0,5 s, 0,25 s och 0,125 s (snabb glitch-stutter). |
-| **Play/Pause (`IO22`)** | Klick | **Freeze / Bypass:** Växla loopning av och på. |
-| | Håll (0,7 s) | **Reverse Loop:** Spela loopen baklänges! |
-| **Next (`IO23`)** | Klick | Växla till **`AMBIENT` Mode**. |
-| | Håll (0,7 s) | Återgå till `VOL` Mode. |
-
----
-
-### 4. `AMBIENT` (OB-4 Disk Mode: Generative Drone)
-Granulerar ett fryst ögonblick av musiken med 4 överlappande Hann-fönstrade stämmor till en oändlig, eterisk ambient drönare.
-
-- **Display:** Visar en levande harmonisk vågform och en reglagelinje för klangfärg / grain position.
-
-| Kontroll | Åtgärd | Funktion |
-|---|---|---|
-| **Rotary Encoder** | Vrid | **Modulera klangfärg:** Flyttar sökfönstret genom ljudet för att utforska ackord och övertoner. |
-| **Play/Pause (`IO22`)** | Klick | **Ny klang:** Fångar en ny punkt i ljudet att granulera. |
-| **Next (`IO23`)** | Klick | Återgå till `VOL` Mode. |
-| | Håll (0,7 s) | Återgå till `VOL` Mode. |
+| **Play/Pause (`IO22`)** | Klick | **Växla rattläge mellan `SIZE` och `MOVE`!** |
+| | Håll (>0.5 s) | **Reverse Loop:** Spela loopen baklänges (`REV`)! |
+| **Rotary Encoder (i `SIZE`)** | Vrid | **Öka / minska looptid:** När du ökar längden läggs den nya tiden till **framåt i låten** så att kommande takter kommer in i loopen! Stegar mellan 0.125 s upp till 16.0 s. |
+| **Rotary Encoder (i `MOVE`)** | Vrid | **Flytta loopen längs tidslinjen:** Skjuter hela loopfönstret framåt eller bakåt genom musiken så du kan hitta det perfekta partiet att loopa. |
+| **Next (`IO23`)** | Klick | Växla tillbaka till **`TAPE` Mode**. |
+| | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Musiken fortsätter spela sömlöst framåt från loopens position in i resten av låten! |
 
 ---
 

@@ -108,7 +108,7 @@ state = {
     "overlay_until": 0.0,
     "last_input": time.monotonic(),
     "shutting_down": False,
-    "mode": "VOL",      # "VOL" | "TAPE" | "LOOP" | "AMBIENT"
+    "mode": "VOL",      # "VOL" | "TAPE" | "LOOP"
 }
 stop_event = threading.Event()
 
@@ -368,15 +368,15 @@ def on_btn_play_short():
         do_playpause()
     elif m == "TAPE":
         if tape:
-            tape.toggle_tape_stop()
+            behind_sec = tape.get_time_behind_live_sec()
+            if behind_sec > 0.08:
+                tape.jump_to_live()
+            else:
+                tape.toggle_tape_stop()
         touch()
     elif m == "LOOP":
         if tape:
-            tape.loop_active = not tape.loop_active
-        touch()
-    elif m == "AMBIENT":
-        if tape:
-            tape.ambient_anchor_pos = tape.head_pos
+            tape.toggle_loop_edit_mode()
         touch()
 
 
@@ -384,30 +384,21 @@ def on_btn_play_long():
     with lock:
         m = state["mode"]
     if m == "VOL":
-        # Om vi lyssnar på fördröjt band: hoppa direkt fram till LIVE! Annars Mute.
         behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
-        if behind_sec > 1.5:
+        if behind_sec > 1.0:
             if tape:
                 tape.jump_to_live()
             touch()
         else:
             do_mute()
     elif m == "TAPE":
-        # Hoppa direkt fram till LIVE på bandet!
         if tape:
             tape.jump_to_live()
         touch()
     elif m == "LOOP":
-        # Växla baklänges loop
         if tape:
             tape.loop_reverse = not tape.loop_reverse
         touch()
-    elif m == "AMBIENT":
-        if tape:
-            tape.set_mode(tape.MODE_VOL)
-        with lock:
-            state["mode"] = "VOL"
-            touch()
 
 
 def on_btn_next_short():
@@ -416,7 +407,7 @@ def on_btn_next_short():
     if m == "VOL":
         do_next()
     else:
-        # Växla mellan OB-4 lägena: TAPE -> LOOP -> AMBIENT -> VOL
+        # Växla mellan de kreativa OB-4 lägena: TAPE <-> LOOP
         nxt = tape.cycle_mode() if tape else "VOL"
         with lock:
             state["mode"] = nxt
@@ -434,7 +425,7 @@ def on_btn_next_long():
             state["mode"] = "TAPE"
             touch()
     else:
-        # Återgå till standard VOL
+        # Återgå till standard VOL (fortsätter sömlöst från aktuell punkt)
         if tape:
             tape.set_mode(tape.MODE_VOL)
         with lock:
@@ -598,7 +589,7 @@ def render_tape_view(d, s, t):
     d.rectangle([0, 0, 36, 9], fill=255)
     d.text((2, 0), "TAPE", font=F_XS, fill=0)
 
-    status = "LIVE" if behind_sec < 0.2 else f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
+    status = "LIVE" if behind_sec < 0.08 else f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
     d.text((W - text_w(d, status, F_XS) - 2, 0), status, font=F_XS, fill=255)
     d.line([(0, 10), (W, 10)], fill=255)
 
@@ -615,34 +606,34 @@ def render_tape_view(d, s, t):
 
     if tape and tape.tape_stop_active:
         sp_str = "STOPPED"
-    elif tape and getattr(tape, "vinyl_state", "") == "SCRATCH":
+    elif behind_sec < 0.08:
+        sp_str = "LIVE (t-0)"
+    elif abs(speed - 1.0) > 0.15:
         sp_str = f"SCRATCH {speed:+.1f}x"
-    elif abs(speed - 1.0) > 0.1:
-        sp_str = f"SPD {speed:+.1f}x"
     else:
         sp_str = "PLAYING"
     d.text((2, 53), sp_str, font=F_XS, fill=255)
-    hint = "HOLD 1:LIVE" if behind_sec > 1.0 else "KNOB:SCRATCH"
+    hint = "BTN1:LIVE" if behind_sec > 0.08 else "BTN2:LOOP"
     d.text((W - text_w(d, hint, F_XS) - 2, 53), hint, font=F_XS, fill=255)
 
 
 def render_loop_view(d, s, t):
     loop_sec = tape.loop_length_s if tape else 2.0
-    is_active = tape.loop_active if tape else True
+    edit_mode = getattr(tape, "loop_edit_mode", "SIZE") if tape else "SIZE"
 
     d.rectangle([0, 0, 36, 9], fill=255)
     d.text((2, 0), "LOOP", font=F_XS, fill=0)
 
-    st = "ACTIVE" if is_active else "BYPASS"
-    d.text((W - text_w(d, st, F_XS) - 2, 0), st, font=F_XS, fill=255)
+    mode_tag = f"[{edit_mode}]"
+    d.text((W - text_w(d, mode_tag, F_XS) - 2, 0), mode_tag, font=F_XS, fill=255)
     d.line([(0, 10), (W, 10)], fill=255)
 
-    sec_str = f"{loop_sec:.2f}s" if loop_sec < 1.0 else f"{loop_sec:.1f}s"
+    sec_str = f"{loop_sec:.3f}s" if loop_sec < 0.5 else (f"{loop_sec:.2f}s" if loop_sec < 1.0 else f"{loop_sec:.1f}s")
     if tape and tape.loop_reverse:
         sec_str += " (REV)"
-    d.text((16, 15), f"LENGTH: {sec_str}", font=F_SM, fill=255)
+    d.text((14, 14), f"LENGTH: {sec_str}", font=F_SM, fill=255)
 
-    box_x0, box_y0, box_x1, box_y1 = 14, 30, 114, 46
+    box_x0, box_y0, box_x1, box_y1 = 14, 28, 114, 44
     d.rectangle([box_x0, box_y0, box_x1, box_y1], outline=255)
 
     # Faslåst playhead: rör sig i perfekt synk med ljudet ur högtalaren!
@@ -654,30 +645,9 @@ def render_loop_view(d, s, t):
         sx = box_x0 + seg * (box_x1 - box_x0) / 4.0
         d.line([(sx, box_y1 - 4), (sx, box_y1 - 1)], fill=255)
 
-    d.text((2, 53), "KNOB:SIZE", font=F_XS, fill=255)
-    d.text((W - text_w(d, "BTN1:FREEZE", F_XS) - 2, 53), "BTN1:FREEZE", font=F_XS, fill=255)
-
-
-def render_ambient_view(d, s, t):
-    d.rectangle([0, 0, 48, 9], fill=255)
-    d.text((2, 0), "AMBIENT", font=F_XS, fill=0)
-    d.text((W - text_w(d, "DRONE", F_XS) - 2, 0), "DRONE", font=F_XS, fill=255)
-    d.line([(0, 10), (W, 10)], fill=255)
-
-    points = []
-    for x in range(0, W, 2):
-        y = 28 + 7 * math.sin(x * 0.12 + t * 3.0) * math.cos(x * 0.05 - t * 1.5)
-        points.append((x, int(y)))
-    for i in range(len(points) - 1):
-        d.line([points[i], points[i + 1]], fill=255)
-
-    d.line([(14, 46), (114, 46)], fill=255)
-    offset_frac = ((tape.ambient_offset / (tape.sr * 5.0)) % 1.0) if tape else 0.5
-    gx = int(14 + offset_frac * 100)
-    d.rectangle([gx - 2, 43, gx + 2, 49], fill=255)
-
-    d.text((2, 53), "GRAIN POS", font=F_XS, fill=255)
-    d.text((W - text_w(d, "BTN2:NEXT", F_XS) - 2, 53), "BTN2:NEXT", font=F_XS, fill=255)
+    knob_lbl = "[SIZE] MOVE" if edit_mode == "SIZE" else "SIZE [MOVE]"
+    d.text((2, 53), knob_lbl, font=F_XS, fill=255)
+    d.text((W - text_w(d, "BTN1:MODE", F_XS) - 2, 53), "BTN1:MODE", font=F_XS, fill=255)
 
 
 def render(t):
@@ -694,15 +664,12 @@ def render(t):
             d.text(((W - w) / 2, 14 + i * 18), line, font=F_MD, fill=255)
         return img, False
 
-    # --- OB-4 Speciallägen (TAPE, LOOP, AMBIENT) -----------------------------
+    # --- OB-4 Speciallägen (TAPE & LOOP) -------------------------------------
     if s["mode"] == "TAPE":
         render_tape_view(d, s, t)
         return img, True
     elif s["mode"] == "LOOP":
         render_loop_view(d, s, t)
-        return img, True
-    elif s["mode"] == "AMBIENT":
-        render_ambient_view(d, s, t)
         return img, True
 
     if now < s["overlay_until"]:

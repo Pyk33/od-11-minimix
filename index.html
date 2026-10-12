@@ -531,7 +531,7 @@
     <div class="hero-section">
       <h1 class="main-title">Snabbguide & <span>Funktioner</span></h1>
       <p class="lead-text">
-        Olle's Mini-Mix är en taktil hårdvarukontroll och ljudstreamer för din Teenage Engineering OD-11. Utrustad med kontinuerlig 15-minuters bandbuffert i minnet, realtidsspolning, looper och generativ ambient drönarsyntes.
+        Olle's Mini-Mix är en taktil hårdvarukontroll och ljudstreamer för din Teenage Engineering OD-11. Utrustad med kontinuerlig 15-minuters bandbuffert i minnet, realtidsspolning, och instant looper med framåtriktad expansion och sömlös uppspelningskontinuitet.
       </p>
     </div>
 
@@ -546,7 +546,7 @@
           <div class="hw-icon-wrap">⟳</div>
           <div class="hw-name">Ratten (Encoder)</div>
           <div class="hw-desc">
-            Optisk steglös ratt med precision. Styr Master-volym i normalläge, spolar i bandet i TAPE-läge, ändrar looplängd i LOOP-läge och modellerar klangfärg i AMBIENT-läge.
+            Optisk steglös ratt med precision. Styr Master-volym i normalläge, spolar och scratchar i bandet i TAPE-läge, och styr looplängd (SIZE) samt loopens position (MOVE) i LOOP-läge.
           </div>
         </div>
 
@@ -555,7 +555,7 @@
           <div class="hw-icon-wrap">▶ ⏸</div>
           <div class="hw-name">Vänster knapp (Play)</div>
           <div class="hw-desc">
-            Växlar Play / Pause i normalläge. I TAPE-läge styr den motorstopp/retardation, och i LOOP-läge fryser den loopen.
+            Växlar Play / Pause i normalläge. I TAPE-läge hoppar den direkt till LIVE (t-0) med ett klick. I LOOP-läge växlar den rattläge mellan SIZE och MOVE.
           </div>
         </div>
 
@@ -564,7 +564,7 @@
           <div class="hw-icon-wrap">⏭ ⚙</div>
           <div class="hw-name">Höger knapp (Next/Mode)</div>
           <div class="hw-desc">
-            Hoppar till nästa låt vid snabbt klick. Hålls den intryckt (~0,7 sek) växlar du mellan de olika kreativa lägena.
+            Hoppar till nästa låt i normalläge. Hålls den intryckt (&gt;0,5 sek) växlar du in och ut ur de kreativa lägena (TAPE & LOOP).
           </div>
         </div>
 
@@ -573,7 +573,7 @@
           <div class="hw-icon-wrap">OLED</div>
           <div class="hw-name">1.3" OLED-display</div>
           <div class="hw-desc">
-            Visar låt, artist, framsteg, stor volymoverlay, animerade rullbandshjul eller loopgrafik. Släcks automatiskt vid inaktivitet.
+            Visar låt, artist, framsteg, stor volymoverlay, animerade rullbandshjul eller faslåst loopgrafik. Släcks automatiskt vid inaktivitet.
           </div>
         </div>
       </div>
@@ -584,17 +584,13 @@
       <div class="flow-label">Hur du växlar lägen:</div>
       <div class="flow-steps">
         <span class="flow-step-badge highlight">1. VOL (Normalläge)</span>
-        <span class="flow-arrow">──(Håll Next 0,7s)──▶</span>
+        <span class="flow-arrow">──(Håll Next &gt;0,5s)──▶</span>
         <span class="flow-step-badge">2. TAPE (Magic Tape)</span>
-        <span class="flow-arrow">──(Klicka Next)──▶</span>
+        <span class="flow-arrow">◀──(Klicka Next)──▶</span>
         <span class="flow-step-badge">3. LOOP (Looper)</span>
-        <span class="flow-arrow">──(Klicka Next)──▶</span>
-        <span class="flow-step-badge">4. AMBIENT (Drone)</span>
-        <span class="flow-arrow">──(Klicka Next)──▶</span>
-        <span class="flow-step-badge highlight">VOL</span>
       </div>
       <div style="font-size:12.5px; color:var(--text-muted); margin-top:4px;">
-        💡 <strong>Tips:</strong> Du kan när som helst hålla in <strong>Next</strong> i 0,7 sekunder från vilket läge som helst för att omedelbart återgå till standardläget (VOL).
+        💡 <strong>Tips:</strong> Håll in <strong>Next</strong> i &gt;0,5 sekunder från TAPE eller LOOP för att omedelbart återgå till standardläget (VOL). Musiken fortsätter alltid spela sömlöst framåt från exakt den punkt nålen befinner sig på!
       </div>
     </div>
 
@@ -657,12 +653,12 @@
         <div class="mode-card-header">
           <div class="mode-title-wrap">
             <span class="mode-number">LÄGE 2</span>
-            <h3 class="mode-name">TAPE — OB-4 Magic Tape (Spolning & Scratch)</h3>
+            <h3 class="mode-name">TAPE — OB-4 Magic Tape (Spolning, Scratch & LIVE)</h3>
           </div>
           <span class="mode-badge-oled">TAPE</span>
         </div>
         <p class="mode-summary">
-          En kontinuerlig 15-minuters bandbuffert spelar in all musik i minnet. Ratten fungerar precis som handen på en <strong>vinylskiva med slipmat</strong>: 1:1 direkt kontakt med spåret! När du snurrar bakåt spelas musiken baklänges i handens hastighet; när du snurrar framåt skrapar den framåt. När du släpper ratten fångar skivspelarmotorn upp skivan mjukt och <strong>musiken fortsätter spela sömlöst från exakt den punkten</strong> utan att hoppa fram till nutid!
+          En kontinuerlig 15-minuters bandbuffert spelar in all musik i minnet. Ratten fungerar precis som handen på en <strong>vinylskiva med slipmat</strong>: 1:1 direkt kontakt med spåret! När du snurrar bakåt spelas musiken baklänges i handens hastighet; när du snurrar framåt spolas musiken framåt med dynamisk hastighetsacceleration så du når LIVE t-0 med ett snabbt knyck. När den når nutid spärras den bergfast vid LIVE. När du släpper ratten fortsätter <strong>musiken spela sömlöst från aktuell punkt</strong> utan att hoppa!
         </p>
 
         <table class="controls-table">
@@ -682,17 +678,17 @@
             <tr>
               <td><span class="ctrl-key">Ratten</span></td>
               <td>Vrid medurs</td>
-              <td><span class="ctrl-action">Vinyl Scratch framåt!</span><div class="ctrl-extra">Skrapar framåt i musiken. När du släpper spinner motorn upp och fortsätter spela framåt från den punkten.</div></td>
+              <td><span class="ctrl-action">Spola framåt mot LIVE!</span><div class="ctrl-extra">Snabb vridning accelererar spolningen. Spärras bergfast vid LIVE (t-0) utan att hoppa förbi.</div></td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Vänster knapp</span></td>
               <td>Kort tryck</td>
-              <td><span class="ctrl-action">Tape Stop / Resume</span><div class="ctrl-extra">Simulerar motorstopp på ett rullband med realistisk inbromsning.</div></td>
+              <td><span class="highlight-cyan">1-KLICK JUMP TO LIVE (t-0)!</span><div class="ctrl-extra">Om du ligger bakom nutid hoppar du omedelbart fram till realtidsmusiken! Vid LIVE växlas Tape Stop (motorbroms).</div></td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Vänster knapp</span></td>
-              <td>Håll intryckt (0,7 s)</td>
-              <td><span class="highlight-cyan">JUMP TO LIVE!</span><div class="ctrl-extra">Hoppar omedelbart fram till realtidsmusiken och återgår till VOL-läget.</div></td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
+              <td><span class="highlight-cyan">JUMP TO LIVE!</span><div class="ctrl-extra">Hoppar omedelbart fram till realtidsmusiken.</div></td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Höger knapp</span></td>
@@ -701,8 +697,8 @@
             </tr>
             <tr>
               <td><span class="ctrl-key">Höger knapp</span></td>
-              <td>Håll intryckt (0,7 s)</td>
-              <td><span class="ctrl-action">Återgå till VOL-läget</span></td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
+              <td><span class="ctrl-action">Återgå till VOL-läget</span><div class="ctrl-extra">Musiken fortsätter spela sömlöst framåt från aktuell punkt!</div></td>
             </tr>
           </tbody>
         </table>
@@ -713,12 +709,12 @@
         <div class="mode-card-header">
           <div class="mode-title-wrap">
             <span class="mode-number">LÄGE 3</span>
-            <h3 class="mode-name">LOOP — Instant Looper & Glitch Stutter</h3>
+            <h3 class="mode-name">LOOP — Instant Looper (Framåt-expansion & Glidande Fönster)</h3>
           </div>
           <span class="mode-badge-oled">LOOP</span>
         </div>
         <p class="mode-summary">
-          Fångar omedelbart en slinga av musiken och upprepar den rytmiskt med klickfria crossfades. Skärmen visar en loopbox med ett pulserande playhead i realtid och vald looplängd.
+          Fångar omedelbart en slinga av musiken och upprepar den rytmiskt med klickfria crossfades. När du ökar looptiden läggs tiden till <strong>framåt i låten</strong> så att kommande takter kommer in i loopen! Du kan även växla ratten till <strong>MOVE</strong> för att flytta hela loopfönstret fram och tillbaka längs låtens tidslinje.
         </p>
 
         <table class="controls-table">
@@ -731,70 +727,34 @@
           </thead>
           <tbody>
             <tr>
-              <td><span class="ctrl-key">Ratten</span></td>
-              <td>Vrid medurs / moturs</td>
-              <td><span class="ctrl-action">Ändra looplängd</span><div class="ctrl-extra">Stega mellan 16 s, 8 s, 4 s, 2 s, 1 s, 0,5 s, 0,25 s och 0,125 s (snabb glitch-stutter).</div></td>
-            </tr>
-            <tr>
               <td><span class="ctrl-key">Vänster knapp</span></td>
               <td>Kort tryck</td>
-              <td><span class="ctrl-action">Freeze / Bypass</span> (pausar loopen eller fortsätter upprepa)</td>
+              <td><span class="highlight-action">Växla rattläge mellan SIZE och MOVE!</span><div class="ctrl-extra">Displayen visar [SIZE] MOVE eller SIZE [MOVE].</div></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Ratten (i SIZE)</span></td>
+              <td>Vrid medurs / moturs</td>
+              <td><span class="ctrl-action">Ändra looplängd (FRAMÅT)</span><div class="ctrl-extra">Starten förblir förankrad och extra tid läggs till framåt i låten! Stegar mellan 0,125 s upp till 16 s.</div></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Ratten (i MOVE)</span></td>
+              <td>Vrid medurs / moturs</td>
+              <td><span class="ctrl-action">Flytta loopen längs tidslinjen</span><div class="ctrl-extra">Skjuter hela loopfönstret framåt eller bakåt så du hittar exakt rätt parti att loopa.</div></td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Vänster knapp</span></td>
-              <td>Håll intryckt (0,7 s)</td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
               <td><span class="highlight-action">Reverse Loop</span> (spelar loopen baklänges!)</td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Höger knapp</span></td>
               <td>Kort tryck</td>
-              <td><span class="ctrl-action">Växla till AMBIENT-läget</span></td>
+              <td><span class="ctrl-action">Växla tillbaka till TAPE-läget</span></td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Höger knapp</span></td>
-              <td>Håll intryckt (0,7 s)</td>
-              <td><span class="ctrl-action">Återgå till VOL-läget</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Läge 4: AMBIENT -->
-      <div class="mode-detail-card">
-        <div class="mode-card-header">
-          <div class="mode-title-wrap">
-            <span class="mode-number">LÄGE 4</span>
-            <h3 class="mode-name">AMBIENT — Disk Drone Synthesizer</h3>
-          </div>
-          <span class="mode-badge-oled">AMBIENT</span>
-        </div>
-        <p class="mode-summary">
-          Baserad på Teenage Engineering OB-4 Disk Mode. Tar ett fryst ögonblick av musiken och granulerar det med 4 överlappande stämmor till en oändlig, eterisk ambient drönare. Skärmen visar en svävande harmonisk vågform.
-        </p>
-
-        <table class="controls-table">
-          <thead>
-            <tr>
-              <th style="width:26%">Reglage</th>
-              <th style="width:28%">Handling</th>
-              <th>Vad som händer</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><span class="ctrl-key">Ratten</span></td>
-              <td>Vrid medurs / moturs</td>
-              <td><span class="ctrl-action">Modulera klangfärg & övertoner</span><div class="ctrl-extra">Flyttar sökfönstret genom det frysta ljudet för att utforska ackord och klangfärger.</div></td>
-            </tr>
-            <tr>
-              <td><span class="ctrl-key">Vänster knapp</span></td>
-              <td>Kort tryck</td>
-              <td><span class="ctrl-action">Frys nytt ljud</span> (fångar en ny punkt i musiken att skapa drönare av)</td>
-            </tr>
-            <tr>
-              <td><span class="ctrl-key">Höger knapp</span></td>
-              <td>Kort tryck / Håll</td>
-              <td><span class="ctrl-action">Återgå till VOL-läget</span></td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
+              <td><span class="ctrl-action">Återgå till VOL-läget</span><div class="ctrl-extra">Musiken fortsätter spela sömlöst framåt från loopen in i resten av låten!</div></td>
             </tr>
           </tbody>
         </table>
