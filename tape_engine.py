@@ -194,16 +194,21 @@ class TapeEngine:
         self.dj_svf_state = _SVFState()
         self._smooth_behind_sec = 0.0
 
-        # Auto DJ Smart Transition state (Seamless Forward DJ Filter Crossfade + Space Tail)
+        # Auto DJ Smart Transition state (Beat-Matched DJ Transition Engine)
         self.is_dj_transition = False
+        self.dj_trans_state = "IDLE"          # "WAIT_AUDIO", "ALIGN_BEAT", "CROSSFADING"
         self.dj_trans_duration_s = 4.0
         self.dj_trans_frames = int(4.0 * sample_rate)
         self.dj_trans_pos = 0
         self.dj_trans_progress = 0.0
         self.dj_trans_bpm = 120.0
+        self.dj_trans_beat_frames = int(0.5 * sample_rate)
+        self.dj_trans_bar_frames = int(2.0 * sample_rate)
         self.dj_trans_track1_head = 0.0
         self.dj_trans_t1_start = 0.0
         self.dj_trans_t1_len = int(2.0 * sample_rate)
+        self.dj_trans_wait_start = 0.0
+        self.dj_trans_wait_timeout = 4.5
         self.dj_trans_svf_t1 = _SVFState()
         self.dj_trans_svf_t2 = _SVFState()
         self.dj_trans_echo_state = _EchoState()
@@ -346,21 +351,34 @@ class TapeEngine:
 
     def start_dj_transition(self, duration_s: Optional[float] = None):
         """
-        Startar en sömlös DJ Smart Crossfade-övergång:
-        Spelar Track 1 framåt från exakt aktuell position (INGET bakåthopp eller repetition!),
-        sveper med LPF och stereo rymdsvans, medan nästa låt tonas in med HPF.
+        Startar en takt- och energinivåsynkad DJ Smart Transition:
+        1. Behåller Track 1 i full volym i sitt musikaliska groove medan Spotify hämtar nästa låt.
+        2. Övervakar inkommande ljudström tills Track 2 faktiskt har ljud och energi.
+        3. Finner taktslag (beats/takt) och matchar energinivån.
+        4. Lanserar crossfade på taktslaget med LPF-basgroove och HPF-insvep.
         """
         with self._lock:
             self.is_dj_transition = True
+            self.dj_trans_state = "WAIT_AUDIO"
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
 
-            # Starta Track 1 från EXAKT aktuell lyssnarposition (self.head_pos) - 0 sampel hopp!
+            # Analysera Track 1 för BPM och taktlängd
+            loop_start, loop_len, bpm = self._detect_natural_loop(live_edge)
+            self.dj_trans_bpm = bpm
+            self.dj_trans_beat_frames = int((60.0 / max(60.0, min(200.0, bpm))) * self.sr)
+            self.dj_trans_bar_frames = max(self.dj_trans_beat_frames * 4, int(1.2 * self.sr))
+
+            # Förankra Track 1: börja från exakt nuvarande uppspelningspunkt (0 ms hopp)
             self.dj_trans_track1_head = self.head_pos
+            self.dj_trans_t1_start = loop_start
+            self.dj_trans_t1_len = self.dj_trans_bar_frames
 
             self.dj_trans_duration_s = float(duration_s) if duration_s is not None else 4.0
             self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
             self.dj_trans_pos = 0
             self.dj_trans_progress = 0.0
+            self.dj_trans_wait_start = time.monotonic()
+            self.dj_trans_wait_timeout = 4.5  # Max väntetid i sekunder innan tvångsstart
             self.dj_trans_svf_t1 = _SVFState()
             self.dj_trans_svf_t2 = _SVFState()
             if _libdsp is not None and hasattr(_libdsp, "echo_init"):
@@ -374,6 +392,7 @@ class TapeEngine:
         """Avslutar övergången omedelbart och låser till nutid."""
         with self._lock:
             self.is_dj_transition = False
+            self.dj_trans_state = "IDLE"
             self.dj_trans_progress = 1.0
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
             self.head_pos = live_edge
@@ -790,70 +809,156 @@ class TapeEngine:
 
                 return out
 
-            # --- MODE_DJ: Seamless Forward DJ Filter Crossfade + Space Tail ---
+            # --- MODE_DJ: Beat-Matched Smart Transition Engine ---
             elif self.mode == self.MODE_DJ:
                 if self.is_dj_transition:
-                    p = self.dj_trans_pos / float(max(1, self.dj_trans_frames))
-                    self.dj_trans_progress = min(1.0, p)
+                    # Mät ljudnivå (RMS & peak) på inkommande ström vid live_edge
+                    pos_live = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
+                    chunk_live = self.tape.read_interp(pos_live)
+                    rms_live = float(np.sqrt(np.mean(chunk_live ** 2)))
+                    peak_live = float(np.max(np.abs(chunk_live)))
+                    now = time.monotonic()
 
-                    # 1. Track 1: Fortsätt framåt från exakt aktuell position UTAN att hoppa bakåt
-                    pos_t1 = (self.dj_trans_track1_head + np.arange(frames_needed)) % self.tape.max_frames
-                    self.dj_trans_track1_head = (self.dj_trans_track1_head + frames_needed) % self.tape.max_frames
-                    audio_t1 = self.tape.read_interp(pos_t1)
+                    # FAS 1: VÄNTA PÅ ATT NÄSTA LÅT FAKTISKT HAR LJUD & ENERGI
+                    if self.dj_trans_state == "WAIT_AUDIO":
+                        has_audio = (rms_live >= 0.012 or peak_live >= 0.035)
+                        timed_out = (now - self.dj_trans_wait_start >= self.dj_trans_wait_timeout)
 
-                    # LPF sveper neråt: tar bort diskant och sång mjukt (-0.15 till -0.85)
-                    f1 = float(np.clip(-0.15 - 0.70 * p, -1.0, 1.0))
-                    g1 = float(np.cos(p * np.pi * 0.5))
+                        if has_audio or timed_out:
+                            self.dj_trans_state = "ALIGN_BEAT"
 
-                    if _libdsp is not None:
-                        audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
-                        ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f1))
+                        # Medan vi väntar: Spela Track 1 i 100 % full volym och håll musiken vid liv!
+                        behind = (live_edge - self.dj_trans_track1_head) % self.tape.max_frames
+                        if behind > self.live_latency_frames * 2 and behind < self.tape.max_frames / 2:
+                            pos_t1 = (self.dj_trans_track1_head + np.arange(frames_needed)) % self.tape.max_frames
+                            self.dj_trans_track1_head = (self.dj_trans_track1_head + frames_needed) % self.tape.max_frames
+                            audio_t1 = self.tape.read_interp(pos_t1)
+                        else:
+                            # Förra låtens ström har nått sitt slut; behåll rytmkärnan i 1-bars loopen
+                            rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % self.dj_trans_t1_len
+                            pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % self.dj_trans_t1_len) % self.tape.max_frames
+                            self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % self.dj_trans_t1_len) % self.tape.max_frames
+                            audio_t1 = self.tape.read_interp(pos_t1)
 
-                    # Stereo Space Echo Tail (Roland Space Echo / Pioneer Echo Out)
-                    # Send dämpar snabbt utgående låt och feedback lämnar en mjuk rymdsvans
-                    send_t1 = float(np.clip(1.0 - 2.0 * p, 0.0, 1.0))
-                    fb_t1 = float(np.clip(0.65 * (1.0 - 0.5 * p), 0.0, 0.65))
-                    echo_out = np.zeros((frames_needed, 2), dtype=np.float32)
+                            wrap_idx = int(self.dj_trans_t1_len - rel)
+                            if 0 <= wrap_idx < frames_needed:
+                                fade_len = min(256, frames_needed - wrap_idx)
+                                if fade_len > 0:
+                                    audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
 
-                    if _libdsp is not None and hasattr(_libdsp, "echo_process_block"):
-                        audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
-                        ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        echo_ptr = echo_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        _libdsp.echo_process_block(ctypes.byref(self.dj_trans_echo_state), ptr1, echo_ptr, frames_needed, ctypes.c_float(send_t1), ctypes.c_float(fb_t1))
-                    else:
-                        self._py_echo_process(audio_t1, echo_out, frames_needed, send_t1, fb_t1)
+                            # Behagligt klubbasfilter (-0.20 LPF) så groovet pumpar utan repetitiva textrader
+                            if _libdsp is not None:
+                                audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
+                                ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                                _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(-0.20))
 
-                    out_t1 = audio_t1 * g1 + echo_out * (0.60 * (1.0 - p))
+                        self.head_pos = self.dj_trans_track1_head
+                        self.dj_trans_progress = 0.0
+                        return audio_t1
 
-                    # 2. Track 2: Inkommande låt från realtidsströmmen + HPF svep in till rent
-                    pos_t2 = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
-                    audio_t2 = self.tape.read_interp(pos_t2)
+                    # FAS 2: SYNKRONISERA MOT NÄSTA TAKTSLAG (BEAT / TAKT)
+                    if self.dj_trans_state == "ALIGN_BEAT":
+                        beat_frames = max(512, self.dj_trans_beat_frames)
+                        rel_in_beat = int(self.dj_trans_track1_head - self.dj_trans_t1_start) % beat_frames
+                        frames_to_beat = beat_frames - rel_in_beat
 
-                    f2 = float(np.clip(0.75 * (1.0 - p), -1.0, 1.0))
-                    g2 = float(np.sin(p * np.pi * 0.5))
+                        if frames_to_beat <= frames_needed or (now - self.dj_trans_wait_start >= self.dj_trans_wait_timeout + 1.0):
+                            # NÄSTA TAKTSLAG TRÄFFAT! Starta crossfaden exakt på takten!
+                            self.dj_trans_state = "CROSSFADING"
+                            self.dj_trans_pos = 0
+                            self.dj_trans_duration_s = max(3.0, min(5.0, 2.0 * (self.dj_trans_bar_frames / float(self.sr))))
+                            self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
 
-                    if _libdsp is not None and f2 >= 0.005:
-                        audio_t2 = np.ascontiguousarray(audio_t2, dtype=np.float32)
-                        ptr2 = audio_t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t2), ptr2, frames_needed, ctypes.c_float(f2))
+                        rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % self.dj_trans_t1_len
+                        pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % self.dj_trans_t1_len) % self.tape.max_frames
+                        self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % self.dj_trans_t1_len) % self.tape.max_frames
+                        audio_t1 = self.tape.read_interp(pos_t1)
 
-                    out_t2 = audio_t2 * g2
+                        wrap_idx = int(self.dj_trans_t1_len - rel)
+                        if 0 <= wrap_idx < frames_needed:
+                            fade_len = min(256, frames_needed - wrap_idx)
+                            if fade_len > 0:
+                                audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
 
-                    # 3. Summering
-                    out = out_t1 + out_t2
+                        if _libdsp is not None:
+                            audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
+                            ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(-0.20))
 
-                    self.head_pos = live_edge
-                    self.dj_trans_pos += frames_needed
-                    if self.dj_trans_pos >= self.dj_trans_frames:
-                        # Övergången är klar! Lås sömlöst till Track 2 i nutid
-                        self.is_dj_transition = False
-                        self.is_live = True
+                        self.head_pos = self.dj_trans_track1_head
+                        self.dj_trans_progress = 0.0
+                        return audio_t1
+
+                    # FAS 3: DJ CROSSFADE MED LPF-GROOVE OCH HPF-DROPP
+                    if self.dj_trans_state == "CROSSFADING":
+                        p = self.dj_trans_pos / float(max(1, self.dj_trans_frames))
+                        self.dj_trans_progress = min(1.0, p)
+
+                        # 1. Track 1: Rytmkärna tonas ut med LPF & rymdsvans
+                        rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % self.dj_trans_t1_len
+                        pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % self.dj_trans_t1_len) % self.tape.max_frames
+                        self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % self.dj_trans_t1_len) % self.tape.max_frames
+                        audio_t1 = self.tape.read_interp(pos_t1)
+
+                        wrap_idx = int(self.dj_trans_t1_len - rel)
+                        if 0 <= wrap_idx < frames_needed:
+                            fade_len = min(256, frames_needed - wrap_idx)
+                            if fade_len > 0:
+                                audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
+
+                        # LPF sveper neråt: -0.20 till -0.85
+                        f1 = float(np.clip(-0.20 - 0.70 * p, -1.0, 1.0))
+                        g1 = float(np.cos(p * np.pi * 0.5))
+
+                        if _libdsp is not None:
+                            audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
+                            ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f1))
+
+                        # Stereo Space Echo Tail
+                        send_t1 = float(np.clip(1.0 - 2.0 * p, 0.0, 1.0))
+                        fb_t1 = float(np.clip(0.65 * (1.0 - 0.5 * p), 0.0, 0.65))
+                        echo_out = np.zeros((frames_needed, 2), dtype=np.float32)
+
+                        if _libdsp is not None and hasattr(_libdsp, "echo_process_block"):
+                            audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
+                            ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                            echo_ptr = echo_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                            _libdsp.echo_process_block(ctypes.byref(self.dj_trans_echo_state), ptr1, echo_ptr, frames_needed, ctypes.c_float(send_t1), ctypes.c_float(fb_t1))
+                        else:
+                            self._py_echo_process(audio_t1, echo_out, frames_needed, send_t1, fb_t1)
+
+                        out_t1 = audio_t1 * g1 + echo_out * (0.60 * (1.0 - p))
+
+                        # 2. Track 2: Inkommande låt vid live_edge + HPF svep in till rent
+                        pos_t2 = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
+                        audio_t2 = self.tape.read_interp(pos_t2)
+
+                        f2 = float(np.clip(0.70 * (1.0 - p), 0.0, 1.0))
+                        g2 = float(np.sin(p * np.pi * 0.5))
+
+                        if _libdsp is not None and f2 >= 0.005:
+                            audio_t2 = np.ascontiguousarray(audio_t2, dtype=np.float32)
+                            ptr2 = audio_t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t2), ptr2, frames_needed, ctypes.c_float(f2))
+
+                        out_t2 = audio_t2 * g2
+
+                        # 3. Summering: konstant total akustisk energi
+                        out = out_t1 + out_t2
+
                         self.head_pos = live_edge
-                        self.speed = 1.0
-                        self.dj_filter_val = 0.0
+                        self.dj_trans_pos += frames_needed
+                        if self.dj_trans_pos >= self.dj_trans_frames:
+                            # Övergången är klar! Lås sömlöst till Track 2 i nutid
+                            self.is_dj_transition = False
+                            self.dj_trans_state = "IDLE"
+                            self.is_live = True
+                            self.head_pos = live_edge
+                            self.speed = 1.0
+                            self.dj_filter_val = 0.0
 
-                    return out
+                        return out
 
                 if self.dj_brake_active:
                     # Turntable brake / motor stop: mjuk motoravstängning

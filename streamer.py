@@ -820,8 +820,15 @@ def render_dj_view(d, s, t):
     d.rectangle([0, 0, 18, 9], fill=255)
     d.text((2, 0), "DJ", font=F_XS, fill=0)
 
+    trans_state = getattr(tape, "dj_trans_state", "CROSSFADING") if tape else "CROSSFADING"
+
     if is_trans:
-        stat = f"{int(bpm)}BPM {int(trans_p * 100)}%"
+        if trans_state == "WAIT_AUDIO":
+            stat = f"{int(bpm)}BPM WAIT"
+        elif trans_state == "ALIGN_BEAT":
+            stat = f"{int(bpm)}BPM SYNC"
+        else:
+            stat = f"{int(bpm)}BPM {int(trans_p * 100)}%"
     elif is_brake:
         stat = "[BRAKE]"
     elif abs(filt_val) < 0.01:
@@ -843,10 +850,16 @@ def render_dj_view(d, s, t):
 
     if is_trans:
         # Dual-track morph: T1 (LPF svep + rymdsvans) och T2 (HPF svep in till rent)
-        cutoff_t1 = max(0.05, 1.0 - trans_p * 0.85)
-        gain_t1 = math.cos(trans_p * math.pi * 0.5)
-        cutoff_t2 = max(0.05, (1.0 - trans_p) * 0.70)
-        gain_t2 = math.sin(trans_p * math.pi * 0.5)
+        if trans_state in ("WAIT_AUDIO", "ALIGN_BEAT"):
+            cutoff_t1 = 0.85
+            gain_t1 = 1.0
+            cutoff_t2 = 0.70
+            gain_t2 = 0.0
+        else:
+            cutoff_t1 = max(0.05, 1.0 - trans_p * 0.85)
+            gain_t1 = math.cos(trans_p * math.pi * 0.5)
+            cutoff_t2 = max(0.05, (1.0 - trans_p) * 0.70)
+            gain_t2 = math.sin(trans_p * math.pi * 0.5)
 
         pts1, pts2 = [], []
         for px in range(bx0 + 1, bx1):
@@ -861,27 +874,41 @@ def render_dj_view(d, s, t):
             pts1.append((px, max(by0 + 2, min(by1 - 2, py1))))
 
             # T2 HPF response (streckad linje som öppnar upp)
-            if rel_x > cutoff_t2:
-                r2 = (0.75 + 0.05 * math.sin(rel_x * 8.0 + t * 6.0)) * gain_t2
-            else:
-                r2 = 0.75 * math.exp(-6.0 * (cutoff_t2 - rel_x)) * gain_t2
-            py2 = int(by1 - 2 - r2 * (h_box - 4))
-            pts2.append((px, max(by0 + 2, min(by1 - 2, py2))))
+            if gain_t2 > 0.01:
+                if rel_x > cutoff_t2:
+                    r2 = (0.75 + 0.05 * math.sin(rel_x * 8.0 + t * 6.0)) * gain_t2
+                else:
+                    r2 = 0.75 * math.exp(-6.0 * (cutoff_t2 - rel_x)) * gain_t2
+                py2 = int(by1 - 2 - r2 * (h_box - 4))
+                pts2.append((px, max(by0 + 2, min(by1 - 2, py2))))
 
         for i in range(len(pts1) - 1):
             d.line([pts1[i], pts1[i+1]], fill=255, width=1)
-            if (i // 2) % 2 == 0:
+            if len(pts2) > i + 1 and (i // 2) % 2 == 0:
                 d.line([pts2[i], pts2[i+1]], fill=255, width=1)
 
         # 3. Crossfade-mätare (y=45..60)
-        d.text((4, 45), "OUT", font=F_XS, fill=255)
-        d.text((bx1 - text_w(d, "IN", F_XS), 45), "IN", font=F_XS, fill=255)
-
-        tl_y = 57
-        d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
-        bar_w = int(trans_p * (bx1 - bx0))
-        if bar_w > 0:
-            d.rectangle([bx0, tl_y - 1, bx0 + bar_w, tl_y + 1], fill=255)
+        if trans_state == "WAIT_AUDIO":
+            d.text((4, 45), "CORE", font=F_XS, fill=255)
+            d.text((bx1 - text_w(d, "WAIT", F_XS), 45), "WAIT", font=F_XS, fill=255)
+            tl_y = 57
+            d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
+            pulse_pos = int((math.sin(t * 8.0) * 0.5 + 0.5) * (bx1 - bx0 - 6))
+            d.rectangle([bx0 + pulse_pos, tl_y - 2, bx0 + pulse_pos + 6, tl_y + 2], fill=255)
+        elif trans_state == "ALIGN_BEAT":
+            d.text((4, 45), "CORE", font=F_XS, fill=255)
+            d.text((bx1 - text_w(d, "SYNC", F_XS), 45), "SYNC", font=F_XS, fill=255)
+            tl_y = 57
+            d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
+            d.rectangle([bx0, tl_y - 2, bx1, tl_y + 2], fill=255)
+        else:
+            d.text((4, 45), "OUT", font=F_XS, fill=255)
+            d.text((bx1 - text_w(d, "IN", F_XS), 45), "IN", font=F_XS, fill=255)
+            tl_y = 57
+            d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
+            bar_w = int(trans_p * (bx1 - bx0))
+            if bar_w > 0:
+                d.rectangle([bx0, tl_y - 1, bx0 + bar_w, tl_y + 1], fill=255)
 
     else:
         pts = []
