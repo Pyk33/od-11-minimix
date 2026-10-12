@@ -207,8 +207,10 @@ class TapeEngine:
         self.dj_trans_track1_head = 0.0
         self.dj_trans_t1_start = 0.0
         self.dj_trans_t1_len = int(2.0 * sample_rate)
+        self.dj_trans_t1_phase = 0
+        self.dj_trans_switched = False
         self.dj_trans_wait_start = 0.0
-        self.dj_trans_wait_timeout = 4.5
+        self.dj_trans_wait_timeout = 5.0
         self.dj_trans_svf_t1 = _SVFState()
         self.dj_trans_svf_t2 = _SVFState()
         self.dj_trans_echo_state = _EchoState()
@@ -349,17 +351,23 @@ class TapeEngine:
         fallback_len = int(2.0 * self.sr)
         return (live_edge - fallback_len) % self.tape.max_frames, fallback_len, 120.0
 
+    def notify_track_switched(self):
+        """Anropas av streamer när nästa låt har laddats och sökts till ~10s."""
+        with self._lock:
+            self.dj_trans_switched = True
+
     def start_dj_transition(self, duration_s: Optional[float] = None):
         """
         Startar en takt- och energinivåsynkad DJ Smart Transition:
         1. Behåller Track 1 i full volym i sitt musikaliska groove medan Spotify hämtar nästa låt.
-        2. Övervakar inkommande ljudström tills Track 2 faktiskt har ljud och energi.
+        2. Övervakar inkommande ljudström tills Track 2 faktiskt har laddats och sökts in ~10 sekunder.
         3. Finner taktslag (beats/takt) och matchar energinivån.
         4. Lanserar crossfade på taktslaget med LPF-basgroove och HPF-insvep.
         """
         with self._lock:
             self.is_dj_transition = True
             self.dj_trans_state = "WAIT_AUDIO"
+            self.dj_trans_switched = False
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
 
             # Analysera Track 1 för BPM och taktlängd
@@ -368,17 +376,18 @@ class TapeEngine:
             self.dj_trans_beat_frames = int((60.0 / max(60.0, min(200.0, bpm))) * self.sr)
             self.dj_trans_bar_frames = max(self.dj_trans_beat_frames * 4, int(1.2 * self.sr))
 
-            # Förankra Track 1: börja från exakt nuvarande uppspelningspunkt (0 ms hopp)
+            # Förankra Track 1: börja exakt från nuvarande uppspelningspunkt (0 ms hopp)
             self.dj_trans_track1_head = self.head_pos
             self.dj_trans_t1_start = loop_start
             self.dj_trans_t1_len = self.dj_trans_bar_frames
+            self.dj_trans_t1_phase = int((live_edge - loop_start) % self.dj_trans_t1_len)
 
             self.dj_trans_duration_s = float(duration_s) if duration_s is not None else 4.0
             self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
             self.dj_trans_pos = 0
             self.dj_trans_progress = 0.0
             self.dj_trans_wait_start = time.monotonic()
-            self.dj_trans_wait_timeout = 4.5  # Max väntetid i sekunder innan tvångsstart
+            self.dj_trans_wait_timeout = 5.0  # Max väntetid i sekunder innan tvångsstart
             self.dj_trans_svf_t1 = _SVFState()
             self.dj_trans_svf_t2 = _SVFState()
             if _libdsp is not None and hasattr(_libdsp, "echo_init"):
@@ -819,59 +828,20 @@ class TapeEngine:
                     peak_live = float(np.max(np.abs(chunk_live)))
                     now = time.monotonic()
 
-                    # FAS 1: VÄNTA PÅ ATT NÄSTA LÅT FAKTISKT HAR LJUD & ENERGI
+                    # FAS 1: VÄNTA PÅ ATT NÄSTA LÅT BYTS, SÖKS TILL 10S OCH FAKTISKT HAR LJUD/ENERGI
                     if self.dj_trans_state == "WAIT_AUDIO":
-                        has_audio = (rms_live >= 0.012 or peak_live >= 0.035)
+                        track_ready = self.dj_trans_switched or (now - self.dj_trans_wait_start >= 1.5)
+                        has_audio = track_ready and (rms_live >= 0.012 or peak_live >= 0.035)
                         timed_out = (now - self.dj_trans_wait_start >= self.dj_trans_wait_timeout)
 
                         if has_audio or timed_out:
                             self.dj_trans_state = "ALIGN_BEAT"
 
-                        # Medan vi väntar: Spela Track 1 i 100 % full volym och håll musiken vid liv!
-                        behind = (live_edge - self.dj_trans_track1_head) % self.tape.max_frames
-                        if behind > self.live_latency_frames * 2 and behind < self.tape.max_frames / 2:
-                            pos_t1 = (self.dj_trans_track1_head + np.arange(frames_needed)) % self.tape.max_frames
-                            self.dj_trans_track1_head = (self.dj_trans_track1_head + frames_needed) % self.tape.max_frames
-                            audio_t1 = self.tape.read_interp(pos_t1)
-                        else:
-                            # Förra låtens ström har nått sitt slut; behåll rytmkärnan i 1-bars loopen
-                            rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % self.dj_trans_t1_len
-                            pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % self.dj_trans_t1_len) % self.tape.max_frames
-                            self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % self.dj_trans_t1_len) % self.tape.max_frames
-                            audio_t1 = self.tape.read_interp(pos_t1)
-
-                            wrap_idx = int(self.dj_trans_t1_len - rel)
-                            if 0 <= wrap_idx < frames_needed:
-                                fade_len = min(256, frames_needed - wrap_idx)
-                                if fade_len > 0:
-                                    audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
-
-                            # Behagligt klubbasfilter (-0.20 LPF) så groovet pumpar utan repetitiva textrader
-                            if _libdsp is not None:
-                                audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
-                                ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                                _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(-0.20))
-
-                        self.head_pos = self.dj_trans_track1_head
-                        self.dj_trans_progress = 0.0
-                        return audio_t1
-
-                    # FAS 2: SYNKRONISERA MOT NÄSTA TAKTSLAG (BEAT / TAKT)
-                    if self.dj_trans_state == "ALIGN_BEAT":
-                        beat_frames = max(512, self.dj_trans_beat_frames)
-                        rel_in_beat = int(self.dj_trans_track1_head - self.dj_trans_t1_start) % beat_frames
-                        frames_to_beat = beat_frames - rel_in_beat
-
-                        if frames_to_beat <= frames_needed or (now - self.dj_trans_wait_start >= self.dj_trans_wait_timeout + 1.0):
-                            # NÄSTA TAKTSLAG TRÄFFAT! Starta crossfaden exakt på takten!
-                            self.dj_trans_state = "CROSSFADING"
-                            self.dj_trans_pos = 0
-                            self.dj_trans_duration_s = max(3.0, min(5.0, 2.0 * (self.dj_trans_bar_frames / float(self.sr))))
-                            self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
-
-                        rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % self.dj_trans_t1_len
-                        pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % self.dj_trans_t1_len) % self.tape.max_frames
-                        self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % self.dj_trans_t1_len) % self.tape.max_frames
+                        # Medan vi väntar: Spela Track 1 i sitt musikaliska groove med klubbasfilter (-0.20 LPF)
+                        rel = self.dj_trans_t1_phase
+                        indices = (rel + np.arange(frames_needed)) % self.dj_trans_t1_len
+                        pos_t1 = (self.dj_trans_t1_start + indices) % self.tape.max_frames
+                        self.dj_trans_t1_phase = int((rel + frames_needed) % self.dj_trans_t1_len)
                         audio_t1 = self.tape.read_interp(pos_t1)
 
                         wrap_idx = int(self.dj_trans_t1_len - rel)
@@ -885,7 +855,41 @@ class TapeEngine:
                             ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
                             _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(-0.20))
 
-                        self.head_pos = self.dj_trans_track1_head
+                        self.head_pos = live_edge
+                        self.dj_trans_progress = 0.0
+                        return audio_t1
+
+                    # FAS 2: SYNKRONISERA MOT NÄSTA TAKTSLAG (BEAT / TAKT)
+                    if self.dj_trans_state == "ALIGN_BEAT":
+                        beat_frames = max(512, self.dj_trans_beat_frames)
+                        rel_in_beat = self.dj_trans_t1_phase % beat_frames
+                        frames_to_beat = beat_frames - rel_in_beat
+
+                        if frames_to_beat <= frames_needed or (now - self.dj_trans_wait_start >= self.dj_trans_wait_timeout + 1.0):
+                            # NÄSTA TAKTSLAG TRÄFFAT! Starta crossfaden exakt på takten!
+                            self.dj_trans_state = "CROSSFADING"
+                            self.dj_trans_pos = 0
+                            self.dj_trans_duration_s = max(3.0, min(5.0, 2.0 * (self.dj_trans_bar_frames / float(self.sr))))
+                            self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
+
+                        rel = self.dj_trans_t1_phase
+                        indices = (rel + np.arange(frames_needed)) % self.dj_trans_t1_len
+                        pos_t1 = (self.dj_trans_t1_start + indices) % self.tape.max_frames
+                        self.dj_trans_t1_phase = int((rel + frames_needed) % self.dj_trans_t1_len)
+                        audio_t1 = self.tape.read_interp(pos_t1)
+
+                        wrap_idx = int(self.dj_trans_t1_len - rel)
+                        if 0 <= wrap_idx < frames_needed:
+                            fade_len = min(256, frames_needed - wrap_idx)
+                            if fade_len > 0:
+                                audio_t1[wrap_idx:wrap_idx + fade_len] *= np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
+
+                        if _libdsp is not None:
+                            audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
+                            ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                            _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(-0.20))
+
+                        self.head_pos = live_edge
                         self.dj_trans_progress = 0.0
                         return audio_t1
 
@@ -895,9 +899,10 @@ class TapeEngine:
                         self.dj_trans_progress = min(1.0, p)
 
                         # 1. Track 1: Rytmkärna tonas ut med LPF & rymdsvans
-                        rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % self.dj_trans_t1_len
-                        pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % self.dj_trans_t1_len) % self.tape.max_frames
-                        self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % self.dj_trans_t1_len) % self.tape.max_frames
+                        rel = self.dj_trans_t1_phase
+                        indices = (rel + np.arange(frames_needed)) % self.dj_trans_t1_len
+                        pos_t1 = (self.dj_trans_t1_start + indices) % self.tape.max_frames
+                        self.dj_trans_t1_phase = int((rel + frames_needed) % self.dj_trans_t1_len)
                         audio_t1 = self.tape.read_interp(pos_t1)
 
                         wrap_idx = int(self.dj_trans_t1_len - rel)

@@ -314,10 +314,16 @@ def spotify_events_loop():
 # --------------------------------------------------------------------------- #
 # Uppspelningsstyrning
 # --------------------------------------------------------------------------- #
-def api_call(method, path):
-    req = urllib.request.Request(API + path, method=method, data=b"" if method == "POST" else None)
+def api_call(method, path, body=None):
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+    else:
+        data = b"" if method == "POST" else None
+        headers = {}
+    req = urllib.request.Request(API + path, method=method, data=data, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=0.8) as r:
+        with urllib.request.urlopen(req, timeout=1.0) as r:
             body = r.read()
             return json.loads(body) if body else {}
     except Exception:
@@ -347,6 +353,53 @@ def do_next():
         state["pos_ms"], state["stamp"] = 0, time.monotonic()
         touch()
     player_cmd("/player/next", "next")
+
+
+def do_dj_next(seek_s: float = 10.0):
+    """
+    DJ Smart Transition: Byter till nästa låt och hoppar direkt ~10 sekunder in
+    så att crossfaden landar i ett aktivt beat/groove istället för en tyst intro.
+    """
+    def run():
+        with lock:
+            is_spotify = state["source"] == "SPOTIFY"
+
+        if not is_spotify:
+            subprocess.run(["playerctl", "next"], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=2, check=False)
+            time.sleep(0.5)
+            if tape:
+                tape.notify_track_switched()
+            return
+
+        s0 = api_call("GET", "/status") or {}
+        t0 = s0.get("track") or {}
+        uri0 = t0.get("uri")
+
+        # Hoppa till nästa låt på Spotify
+        api_call("POST", "/player/next")
+
+        # Vänta på att go-librespot byter track URI och sök direkt till ~10s
+        start_t = time.monotonic()
+        while time.monotonic() - start_t < 3.5:
+            time.sleep(0.04)
+            s1 = api_call("GET", "/status") or {}
+            t1 = s1.get("track") or {}
+            uri1 = t1.get("uri")
+            if uri1 and uri1 != uri0:
+                dur = t1.get("duration") or 180000
+                seek_ms = int(seek_s * 1000) if dur > (seek_s * 2000) else int(dur * 0.1)
+                api_call("POST", "/player/seek", {"position": seek_ms})
+                with lock:
+                    state["pos_ms"] = seek_ms
+                    state["stamp"] = time.monotonic()
+                    touch()
+                break
+
+        if tape:
+            tape.notify_track_switched()
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def do_prev():
@@ -389,7 +442,7 @@ def on_btn_play_short():
                 tape.end_dj_transition()
             else:
                 tape.start_dj_transition()
-                do_next()
+                do_dj_next(seek_s=10.0)
         touch()
 
 
