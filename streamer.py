@@ -583,6 +583,38 @@ def draw_tape_reel(d, cx, cy, radius, angle):
         d.line([(cx, cy), (x2, y2)], fill=255)
 
 
+def draw_btn_hint(d, right_x, y, btn="top", label="LIVE", is_hold=False):
+    """
+    Ritar en Teenage Engineering-inspirerad vertikal 2-knappskapsel (trafikljus):
+      btn='top': övre knappen (Play/Pause, IO22) är aktiv/fylld.
+      btn='bottom': nedre knappen (Next, IO23) är aktiv/fylld.
+      is_hold=True: visar 'HOLD:' före etiketten.
+    Placeras högerjusterat vid right_x (t.ex. W - 2).
+    """
+    pill_w = 7
+    pill_h = 11
+    full_text = f"HOLD:{label}" if is_hold else label
+    tw = text_w(d, full_text, F_XS)
+    spacing = 3
+    total_w = pill_w + spacing + tw
+    px = int(right_x - total_w)
+    py = int(y)
+
+    d.rounded_rectangle([px, py, px + pill_w, py + pill_h], radius=2, outline=255)
+    if btn == "top":
+        d.rectangle([px + 2, py + 2, px + 5, py + 4], fill=255)
+        d.rectangle([px + 2, py + 7, px + 5, py + 9], outline=255)
+    elif btn == "bottom":
+        d.rectangle([px + 2, py + 2, px + 5, py + 4], outline=255)
+        d.rectangle([px + 2, py + 7, px + 5, py + 9], fill=255)
+    else:
+        d.rectangle([px + 2, py + 2, px + 5, py + 4], outline=255)
+        d.rectangle([px + 2, py + 7, px + 5, py + 9], outline=255)
+
+    d.text((px + pill_w + spacing, y), full_text, font=F_XS, fill=255)
+    return total_w
+
+
 def render_tape_view(d, s, t):
     behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
     speed = tape.speed if tape else 1.0
@@ -629,12 +661,11 @@ def render_tape_view(d, s, t):
     d.text((2, 53), sp_str, font=F_XS, fill=255)
 
     if behind_sec > 0.08 and not is_merging:
-        hint = "BTN1:LIVE"
+        draw_btn_hint(d, W - 2, 53, btn="top", label="LIVE")
     elif not is_playing:
-        hint = "BTN1:PLAY"
+        draw_btn_hint(d, W - 2, 53, btn="top", label="PLAY")
     else:
-        hint = "BTN2:LOOP"
-    d.text((W - text_w(d, hint, F_XS) - 2, 53), hint, font=F_XS, fill=255)
+        draw_btn_hint(d, W - 2, 53, btn="bottom", label="LOOP")
 
 
 def render_loop_view(d, s, t):
@@ -667,7 +698,7 @@ def render_loop_view(d, s, t):
 
     knob_lbl = "[SIZE] MOVE" if edit_mode == "SIZE" else "SIZE [MOVE]"
     d.text((2, 53), knob_lbl, font=F_XS, fill=255)
-    d.text((W - text_w(d, "BTN1:MODE", F_XS) - 2, 53), "BTN1:MODE", font=F_XS, fill=255)
+    draw_btn_hint(d, W - 2, 53, btn="top", label="SWAP")
 
 
 def render(t):

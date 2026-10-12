@@ -25,9 +25,9 @@ Normal uppspelning från Spotify Connect eller AirPlay.
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
 | **Rotary Encoder** | Vrid medurs / moturs | Höj / sänk volym (0–85 %). Stor TE-volymoverlay visas på skärmen. |
-| **Play/Pause (`IO22`)** | Klick | Play / Pause (Spotify / AirPlay). |
+| **Övre knapp (Play/Pause `IO22`)** | Klick | Play / Pause (Spotify / AirPlay). |
 | | Håll (>0.5 s) | Mute / Unmute (eller hoppa till LIVE om du lyssnar med bandfördröjning). |
-| **Next (`IO23`)** | Klick | Nästa låt (Spotify / AirPlay). |
+| **Nedre knapp (Next `IO23`)** | Klick | Nästa låt (Spotify / AirPlay). |
 | | Håll (>0.5 s) | **Gå in i OB-4 `TAPE` Mode!** |
 
 ---
@@ -36,14 +36,18 @@ Normal uppspelning från Spotify Connect eller AirPlay.
 En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz stereo. I detta läge kan du spola bakåt och framåt i tiden med autentisk 1:1 slipmat-känsla och mekanisk tröghet.
 
 - **Display:** Visar två animerade rullbandshjul som snurrar i takt med bandhastigheten, tidsskillnad mot live (`LIVE` eller `-MM:SS`), och bandhuvud.
+- **Trafikljusikon (nedre högra hörnet):** En vertikal 2-knappskapsel visar med en fylld kvadrat vilken fysisk knapp som tipsas om:
+  - Övre knapp fylld + `LIVE`: Klicka övre knapp för 1-klick DJ Merge till nutid!
+  - Övre knapp fylld + `PLAY`: Klicka övre knapp för att starta musiken igen.
+  - Nedre knapp fylld + `LOOP`: Klicka nedre knapp för att hoppa till Loop-läget.
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
 | **Rotary Encoder** | Vrid moturs | **Scratcha bakåt i musikhistorien!** (1:1 autentisk vinylkänsla). |
 | | Vrid medurs | **Super Spool framåt mot LIVE:** Snabb vridning accelererar spolningen exponentiellt (upp till 30x) så du sveper 30–60 sekunder på nolltid. Spärras och fastnar bergfast vid LIVE (t-0). |
-| **Play/Pause (`IO22`)** | Klick | **1-KLICK DJ MERGE TO LIVE!** Om du ligger bakom nutid görs en mjuk equal-power DJ-crossfade som stilrent mixar bandet in i realtidsströmmen! Vid LIVE: Vanlig **Play / Pause** (pausar musiken och visar `PAUSED`). |
+| **Övre knapp (`IO22`)** | Klick | **1-KLICK DJ MERGE TO LIVE!** Om du ligger bakom nutid görs en mjuk equal-power DJ-crossfade som stilrent mixar bandet in i realtidsströmmen! Vid LIVE: Vanlig **Play / Pause** (pausar musiken och visar `PAUSED`). |
 | | Håll (>0.5 s) | **Direkt snitt till LIVE:** Omedelbart klipp fram till realtidsströmmen utan fade. |
-| **Next (`IO23`)** | Klick | Växla till **`LOOP` Mode**. |
+| **Nedre knapp (`IO23`)** | Klick | Växla till **`LOOP` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Låten fortsätter spela sömlöst framåt från exakt den punkt nålen befinner sig på! |
 
 ---
@@ -52,14 +56,16 @@ En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz s
 Fångar omedelbart en slinga av musiken och upprepar den med klickfria equal-power crossfades.
 
 - **Display:** Visar aktiv slinga, looplängd i sekunder, aktivt rattläge (`[SIZE] MOVE` eller `SIZE [MOVE]`), samt en faslåst loopindikator som rör sig i perfekt takt med takten i högtalaren.
+- **Trafikljusikon (nedre högra hörnet):**
+  - Övre knapp fylld + `SWAP`: Klicka övre knappen för att växla ratten mellan `[SIZE]` (längd) och `[MOVE]` (flytta loopen).
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
-| **Play/Pause (`IO22`)** | Klick | **Växla rattläge mellan `SIZE` och `MOVE`!** |
+| **Övre knapp (`IO22`)** | Klick | **Växla rattläge mellan `SIZE` och `MOVE` (`SWAP`)!** |
 | | Håll (>0.5 s) | **Reverse Loop:** Spela loopen baklänges (`REV`)! |
 | **Rotary Encoder (i `SIZE`)** | Vrid | **Öka / minska looptid:** När du ökar längden läggs den nya tiden till **framåt i låten** så att kommande takter kommer in i loopen! Stegar mellan 0.125 s upp till 16.0 s. |
 | **Rotary Encoder (i `MOVE`)** | Vrid | **Flytta loopen längs tidslinjen:** Skjuter hela loopfönstret framåt eller bakåt genom musiken så du kan hitta det perfekta partiet att loopa. |
-| **Next (`IO23`)** | Klick | Växla tillbaka till **`TAPE` Mode**. |
+| **Nedre knapp (`IO23`)** | Klick | Växla tillbaka till **`TAPE` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Musiken fortsätter spela sömlöst framåt från loopens position in i resten av låten! |
 
 ---
