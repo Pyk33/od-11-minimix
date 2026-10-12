@@ -171,6 +171,7 @@ class TapeEngine:
         self.dj_filter_val = 0.0        # -1.0 (LPF) .. 0.0 (Clean) .. +1.0 (HPF)
         self.dj_brake_active = False    # Sant när skivbromsen hålls nere
         self.dj_svf_state = _SVFState()
+        self._smooth_behind_sec = 0.0
 
         self._lock = threading.Lock()
 
@@ -189,11 +190,13 @@ class TapeEngine:
                 self.speed = 1.0
                 self._pending_tape_steps = 0
                 self.dj_brake_active = False
+                self.loop_active = False
 
             elif new_mode == self.MODE_TAPE:
                 # Gå in i TAPE: behåll nålen exakt på låten där den spelar
                 self._pending_tape_steps = 0
                 self.dj_brake_active = False
+                self.loop_active = False
 
             elif new_mode == self.MODE_LOOP:
                 # Fånga slinga från nuvarande uppspelningsposition
@@ -211,6 +214,7 @@ class TapeEngine:
                 self.dj_brake_active = False
                 self.speed = 1.0
                 self._pending_tape_steps = 0
+                self.loop_active = False
 
     def cycle_mode(self) -> str:
         """Växlar i cirkel mellan de tre kreativa lägena: TAPE -> LOOP -> DJ -> TAPE."""
@@ -365,12 +369,20 @@ class TapeEngine:
         """Sekunder efter realtidsströmmen (visar 0.0 vid LIVE t-0)."""
         with self._lock:
             if self.is_live:
+                self._smooth_behind_sec = 0.0
                 return 0.0
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
             behind = (live_edge - self.head_pos) % self.tape.max_frames
-            if behind > self.tape.max_frames / 2 or behind < int(0.04 * self.sr):
+            if behind > self.tape.max_frames / 2 or behind < int(0.08 * self.sr):
+                self._smooth_behind_sec = 0.0
                 return 0.0
-            return max(0.0, behind / self.sr)
+            raw_sec = max(0.0, behind / self.sr)
+            # Mjuk lågpassfiltrering för att helt eliminera ALSA trådjitter på sekundgränser
+            if abs(self._smooth_behind_sec - raw_sec) > 1.5 or self._smooth_behind_sec == 0.0:
+                self._smooth_behind_sec = raw_sec
+            else:
+                self._smooth_behind_sec = 0.85 * self._smooth_behind_sec + 0.15 * raw_sec
+            return self._smooth_behind_sec
 
     def get_loop_behind_live_sec(self) -> float:
         """Sekunder mellan LIVE och loopens startpunkt."""

@@ -667,7 +667,8 @@ def render_tape_view(d, s, t):
     elif behind_sec < 0.08:
         status = "LIVE"
     else:
-        status = f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
+        tot_s = int(round(behind_sec))
+        status = f"-{tot_s//60:02d}:{tot_s%60:02d}"
     d.text((W_MAIN - text_w(d, status, F_XS) - 2, 0), status, font=F_XS, fill=255)
     d.line([(0, 10), (W_MAIN, 10)], fill=255)
 
@@ -922,7 +923,8 @@ def render(t):
         d.text((2, 0), src, font=F_XS, fill=255)
         behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
         if behind_sec > 1.5:
-            stat = f"-{int(behind_sec//60):02d}:{int(behind_sec%60):02d}"
+            tot_s = int(round(behind_sec))
+            stat = f"-{tot_s//60:02d}:{tot_s%60:02d}"
         else:
             stat = "PLAY" if s["playing"] and s["source"] else ("PAUS" if s["source"] else "RDY")
         d.text((W_MAIN - 2 - text_w(d, stat, F_XS), 0), stat, font=F_XS, fill=255)
