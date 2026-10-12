@@ -194,19 +194,18 @@ class TapeEngine:
         self.dj_svf_state = _SVFState()
         self._smooth_behind_sec = 0.0
 
-        # Auto DJ Echo Freeze & Drop Transition state (Pioneer DJM Club Standard)
+        # Auto DJ Smart Transition state (Natural Beat-Loop Crossfade)
         self.is_dj_transition = False
-        self.dj_trans_duration_s = 4.5
-        self.dj_trans_frames = int(4.5 * sample_rate)
+        self.dj_trans_duration_s = 5.0
+        self.dj_trans_frames = int(5.0 * sample_rate)
         self.dj_trans_pos = 0
         self.dj_trans_progress = 0.0
-        self.dj_trans_phase = "FREEZE"   # "FREEZE" (0..0.8s) eller "DROP" (0.8s..4.5s)
+        self.dj_trans_bpm = 120.0
         self.dj_trans_track1_head = 0.0
+        self.dj_trans_t1_start = 0.0
+        self.dj_trans_t1_len = int(2.0 * sample_rate)
         self.dj_trans_svf_t1 = _SVFState()
-        self.dj_trans_echo_state = _EchoState()
-        self._py_echo_buf = np.zeros((48000, 2), dtype=np.float32)
-        self._py_echo_write_idx = 0
-        self._py_echo_damp = np.zeros(2, dtype=np.float32)
+        self.dj_trans_svf_t2 = _SVFState()
 
         self._lock = threading.Lock()
 
@@ -285,24 +284,91 @@ class TapeEngine:
                 self.dj_brake_active = bool(active)
             return self.dj_brake_active
 
-    def start_dj_transition(self, duration_s: float = 4.5):
-        """Startar en professionell Echo Freeze & Drop DJ-övergång till nästa låt."""
+    def _detect_natural_loop(self, live_edge: int) -> tuple[int, int, float]:
+        """
+        Analyserar de senaste 3.5 sekunderna i bandbufferten för att hitta
+        låtens naturliga BPM och taktlängd (1 bar = 4 beats) synkad till taktslag.
+        Returnerar (loop_start, loop_len_frames, bpm).
+        """
+        SEARCH_S = 3.5
+        n_search = int(SEARCH_S * self.sr)
+        pos = (live_edge - n_search + np.arange(n_search)) % self.tape.max_frames
+        raw = self.tape.read_interp(pos)
+        mono = 0.5 * (raw[:, 0] + raw[:, 1])
+
+        hop = int(self.sr * 0.010)  # 10 ms upplösning
+        n_frames = len(mono) // hop
+        if n_frames < 100:
+            fallback = int(2.0 * self.sr)
+            return (live_edge - fallback) % self.tape.max_frames, fallback, 120.0
+
+        mono_frames = mono[:n_frames * hop].reshape(n_frames, hop)
+        energy = np.mean(mono_frames ** 2, axis=1)
+        onset = np.maximum(0, np.diff(energy))
+
+        if len(onset) > 50:
+            onset_norm = onset - np.mean(onset)
+            std = float(np.std(onset_norm))
+            if std > 1e-6:
+                onset_norm /= std
+
+            # Sök BPM mellan 85 och 165 (lag 36..71 frames)
+            min_lag = int(0.36 * 100)
+            max_lag = int(0.71 * 100)
+            corr = np.correlate(onset_norm, onset_norm, mode='full')
+            center = len(onset_norm) - 1
+            search_corr = corr[center + min_lag : center + max_lag + 1]
+
+            if len(search_corr) > 0 and float(np.max(search_corr)) > 0.08:
+                best_lag = min_lag + int(np.argmax(search_corr))
+                bpm = float(np.clip(60.0 / (best_lag * 0.010), 80.0, 175.0))
+                beat_frames = best_lag * hop
+                # 1 bar = 4 beats. Om 1 bar är kort (<1.4s vid snabb musik), använd 2 bars = 8 beats
+                bar_frames = 4 * beat_frames
+                if bar_frames < int(1.4 * self.sr):
+                    bar_frames *= 2
+
+                # Fashitta: hitta starkaste taktslag
+                phase_scores = [float(np.sum(onset[shift::best_lag])) for shift in range(min(best_lag, len(onset)))]
+                best_phase = int(np.argmax(phase_scores))
+                phase_samples = best_phase * hop
+
+                loop_len = bar_frames
+                loop_start = (live_edge - loop_len) % self.tape.max_frames
+                return loop_start, loop_len, bpm
+
+        fallback_len = int(2.0 * self.sr)
+        return (live_edge - fallback_len) % self.tape.max_frames, fallback_len, 120.0
+
+    def start_dj_transition(self, duration_s: Optional[float] = None):
+        """
+        Startar en automatisk Natural Beat-Loop DJ-övergång:
+        Detekterar låtens BPM och naturliga takt (1–2 bars), loopar groovet sömlöst,
+        sveper med LPF och tonar in nästa låt från Spotify.
+        """
         with self._lock:
             self.is_dj_transition = True
-            self.dj_trans_duration_s = duration_s
-            self.dj_trans_frames = int(duration_s * self.sr)
+            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+
+            # Detektera det naturliga beat-loop fönstret
+            loop_start, loop_len, bpm = self._detect_natural_loop(live_edge)
+            self.dj_trans_t1_start = loop_start
+            self.dj_trans_t1_len = loop_len
+            self.dj_trans_track1_head = loop_start
+            self.dj_trans_bpm = bpm
+
+            # Anpassa transitionens längd musikaliskt till ~2.5 bars (ca 4.0–6.0s)
+            bar_sec = loop_len / float(self.sr)
+            if duration_s is None:
+                self.dj_trans_duration_s = float(np.clip(2.5 * bar_sec, 4.0, 6.0))
+            else:
+                self.dj_trans_duration_s = float(duration_s)
+
+            self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
             self.dj_trans_pos = 0
             self.dj_trans_progress = 0.0
-            self.dj_trans_phase = "FREEZE"
-            live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
-            self.dj_trans_track1_head = self.head_pos if not self.is_live else live_edge
             self.dj_trans_svf_t1 = _SVFState()
-            if _libdsp is not None and hasattr(_libdsp, "echo_init"):
-                _libdsp.echo_init(ctypes.byref(self.dj_trans_echo_state), self.sr)
-            else:
-                self._py_echo_buf.fill(0.0)
-                self._py_echo_write_idx = 0
-                self._py_echo_damp.fill(0.0)
+            self.dj_trans_svf_t2 = _SVFState()
             self.dj_brake_active = False
 
     def end_dj_transition(self):
@@ -725,82 +791,59 @@ class TapeEngine:
 
                 return out
 
-            # --- MODE_DJ: Echo Freeze & Drop (Pioneer DJM Club Standard) ---
+            # --- MODE_DJ: Natural Beat-Loop Smart Crossfade ---
             elif self.mode == self.MODE_DJ:
                 if self.is_dj_transition:
                     p = self.dj_trans_pos / float(max(1, self.dj_trans_frames))
                     self.dj_trans_progress = min(1.0, p)
-                    t_sec = p * self.dj_trans_duration_s
 
-                    # 1. Track 1 Processing (High-Pass Tension Build -> Echo Freeze)
-                    pos_t1 = (self.dj_trans_track1_head + np.arange(frames_needed)) % self.tape.max_frames
-                    self.dj_trans_track1_head = (self.dj_trans_track1_head + frames_needed) % self.tape.max_frames
+                    # 1. Track 1: Sömlös naturlig beat-loop + LPF sveper neråt + fade out
+                    loop_frames = max(256, self.dj_trans_t1_len)
+                    rel = (self.dj_trans_track1_head - self.dj_trans_t1_start) % loop_frames
+                    pos_t1 = (self.dj_trans_t1_start + (rel + np.arange(frames_needed)) % loop_frames) % self.tape.max_frames
+                    self.dj_trans_track1_head = (self.dj_trans_t1_start + (rel + frames_needed) % loop_frames) % self.tape.max_frames
                     audio_t1 = self.tape.read_interp(pos_t1)
 
-                    FREEZE_POINT_S = 0.8  # 0.8 sekunder build-up innan drop
-                    is_pre_drop = (t_sec < FREEZE_POINT_S)
-                    self.dj_trans_phase = "FREEZE" if is_pre_drop else "DROP"
+                    # Mjuk mikro-crossfade vid loop-skarven
+                    wrap_idx = int(loop_frames - rel)
+                    if 0 <= wrap_idx < frames_needed:
+                        fade_len = min(256, frames_needed - wrap_idx)
+                        if fade_len > 0:
+                            fade_in = np.linspace(0.0, 1.0, fade_len)[:, np.newaxis]
+                            audio_t1[wrap_idx:wrap_idx + fade_len] *= fade_in
 
-                    if is_pre_drop:
-                        # HPF sveper uppåt från 0.0 till 0.45 (skär bas under 350Hz och bygger spänning)
-                        ramp_freeze = t_sec / FREEZE_POINT_S
-                        hpf_t1 = float(np.clip(0.45 * ramp_freeze, 0.0, 1.0))
-                        dry_gain_t1 = float(np.cos(ramp_freeze * np.pi * 0.5))
-                        send_echo = 1.0
-                        feedback = 0.70
-                    else:
-                        # Efter drop: ljudet är fryst i ekoloopen!
-                        hpf_t1 = 0.45
-                        dry_gain_t1 = 0.0
-                        send_echo = 0.0  # Frys delay-ingången!
-                        tail_rel = (t_sec - FREEZE_POINT_S) / max(0.01, self.dj_trans_duration_s - FREEZE_POINT_S)
-                        feedback = float(np.clip(0.70 * ((1.0 - tail_rel) ** 1.2), 0.0, 0.70))
+                    # LPF sveper neråt: tar bort diskant och sång, lämnar pulserande klubbas/groove
+                    f1 = float(np.clip(-0.10 - 0.75 * p, -1.0, 1.0))
+                    g1 = float(np.cos(p * np.pi * 0.5))
 
-                    # Filtrera Track 1 med HPF (lyfter upp i taket)
-                    if _libdsp is not None and hpf_t1 >= 0.005:
+                    if _libdsp is not None:
                         audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
                         ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(hpf_t1))
+                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f1))
 
-                    # Kör genom stereo Echo Freeze motorn
-                    echo_out = np.zeros((frames_needed, 2), dtype=np.float32)
-                    if _libdsp is not None and hasattr(_libdsp, "echo_process_block"):
-                        audio_t1 = np.ascontiguousarray(audio_t1, dtype=np.float32)
-                        ptr_in = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        ptr_out = echo_out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
-                        _libdsp.echo_process_block(
-                            ctypes.byref(self.dj_trans_echo_state),
-                            ptr_in,
-                            ptr_out,
-                            frames_needed,
-                            ctypes.c_float(send_echo),
-                            ctypes.c_float(feedback)
-                        )
-                    else:
-                        self._py_echo_process(audio_t1, echo_out, frames_needed, send_echo, feedback)
+                    audio_t1 *= g1
 
-                    out_t1 = audio_t1 * dry_gain_t1 + echo_out * 0.75
-
-                    # 2. Track 2 Processing (THE DROP!)
+                    # 2. Track 2: Inkommande låt från realtidsströmmen + HPF svep in till rent
                     pos_t2 = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
                     audio_t2 = self.tape.read_interp(pos_t2)
 
-                    if is_pre_drop:
-                        t2_gain = 0.0  # Tyst under de första 0.8s medan Track 1 bygger upp ekot
-                    else:
-                        # Droppar med 100% full bas och volym! Snabb 60ms mikro-ramp för att undvika knäpp
-                        drop_time = t_sec - FREEZE_POINT_S
-                        t2_gain = float(np.clip(drop_time / 0.06, 0.0, 1.0))
+                    f2 = float(np.clip(0.70 * (1.0 - p), -1.0, 1.0))
+                    g2 = float(np.sin(p * np.pi * 0.5))
 
-                    out_t2 = audio_t2 * t2_gain
+                    if _libdsp is not None and f2 >= 0.005:
+                        audio_t2 = np.ascontiguousarray(audio_t2, dtype=np.float32)
+                        ptr2 = audio_t2.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                        _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t2), ptr2, frames_needed, ctypes.c_float(f2))
 
-                    # 3. Summering: Track 1 Echo + Track 2 Full Drop
-                    out = out_t1 + out_t2
+                    audio_t2 *= g2
+
+                    # 3. Summering
+                    out = audio_t1 + audio_t2
 
                     self.head_pos = live_edge
                     self.dj_trans_pos += frames_needed
                     if self.dj_trans_pos >= self.dj_trans_frames:
-                        # Övergången är klar! Fortsätt rent i nutid
+                        # Övergången är klar! Lås sömlöst till Track 2 i nutid
                         self.is_dj_transition = False
                         self.is_live = True
                         self.head_pos = live_edge
