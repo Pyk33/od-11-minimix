@@ -11,6 +11,7 @@ Funktioner inspirerade av Teenage Engineering OB-4:
   6. Bergfast LIVE-lås och renodlad Play/Pause vid t-0.
 """
 import math
+import os
 import threading
 import time
 from typing import Optional, Tuple
@@ -23,7 +24,8 @@ SAMPLE_RATE = 48000
 CHANNELS = 2
 BLOCK_SIZE = 1024                    # ~21.3 ms per block vid 48 kHz
 DEFAULT_TAPE_MINUTES = 15            # ~172 MB int16 stereo RAM
-SAMPLES_PER_STEP = 42                # ~2.1 sekunder per helt varv (2400 steg) – 1:1 vinyl slipmat
+# Bas-känslighet för bandspolning (högre värde = känsligare för stora hjul / rotor)
+SAMPLES_PER_STEP = int(os.environ.get("TAPE_SAMPLES_PER_STEP", "200"))
 
 # --------------------------------------------------------------------------- #
 # Cirkulär bandbuffert
@@ -229,7 +231,7 @@ class TapeEngine:
                 if self.loop_edit_mode == "SIZE":
                     # KRAV 2: Lägg till tid FRAMÅT i loopen!
                     self._loop_accum += steps
-                    THRESHOLD = 40
+                    THRESHOLD = 20  # Känsligare respons för stor rotor/ratt
                     if abs(self._loop_accum) >= THRESHOLD:
                         direction = 1 if self._loop_accum > 0 else -1
                         self._loop_accum = 0
@@ -382,9 +384,13 @@ class TapeEngine:
                     steps = self._pending_tape_steps
                     self._pending_tape_steps = 0
                     if steps < 0:
-                        # Användaren scratchar bakåt i musikhistorien
+                        # Användaren scratchar bakåt i musikhistorien från LIVE
                         self.is_live = False
-                        back_dist = abs(steps * SAMPLES_PER_STEP)
+                        rate = self._velocity_est
+                        gain = 1.5 if rate < 200 else (4.0 if rate < 600 else (12.0 if rate < 1200 else 25.0))
+                        back_dist = abs(steps * int(SAMPLES_PER_STEP * gain))
+                        min_scratch = int(0.50 * self.sr)
+                        back_dist = max(min_scratch, back_dist)
                         self.head_pos = (live_edge - back_dist) % self.tape.max_frames
                         self.speed = float(np.clip(-back_dist / frames_needed, -6.0, -0.2))
                         pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
@@ -415,16 +421,18 @@ class TapeEngine:
 
                     if steps > 0:
                         # SUPER SPOOL FRAMÅT MOT LIVE:
-                        # Flerstegs hastighetsacceleration baserad på rotationshastighet
+                        # Flerstegs hastighetsacceleration anpassad för stor rotor
                         rate = self._velocity_est
                         if rate > 2000:
-                            gain = 30.0
+                            gain = 35.0
                         elif rate > 1200:
-                            gain = 20.0
+                            gain = 22.0
                         elif rate > 600:
-                            gain = 10.0
+                            gain = 12.0
                         elif rate > 300:
-                            gain = 4.0
+                            gain = 5.0
+                        elif rate > 150:
+                            gain = 2.5
                         else:
                             gain = 1.5
 
@@ -450,8 +458,22 @@ class TapeEngine:
                             self.speed = float(np.clip(delta_samples / frames_needed, 1.0, 6.0))
 
                     else:
-                        # BAKÅT: 1:1 autentisk vinylkänsla
-                        effective_step = SAMPLES_PER_STEP
+                        # BAKÅT: Responsiv vinylscratch med dynamisk hastighetsacceleration
+                        rate = self._velocity_est
+                        if rate > 2000:
+                            gain = 25.0
+                        elif rate > 1200:
+                            gain = 16.0
+                        elif rate > 600:
+                            gain = 8.0
+                        elif rate > 300:
+                            gain = 4.0
+                        elif rate > 150:
+                            gain = 2.0
+                        else:
+                            gain = 1.0
+
+                        effective_step = int(SAMPLES_PER_STEP * gain)
                         delta_samples = steps * effective_step
                         back_dist = abs(delta_samples)
                         remaining = max(0, max_history - current_behind)
