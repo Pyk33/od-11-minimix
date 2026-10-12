@@ -337,15 +337,15 @@ class TapeEngine:
 
             elif self.mode == self.MODE_DJ:
                 # Ratten styr bi-polärt DJ-filter (-1.0 LPF .. 0.0 Clean .. +1.0 HPF)
-                # 0.04 per steg ger ca 25 klick för ett komplett svep från neutral till max
+                # Anpassad för stor rotor: ca 500 steg (~1/2 varv) för fullt svep från neutral till max
                 old_val = self.dj_filter_val
-                delta = steps * 0.04
+                delta = steps * 0.0018
                 new_val = float(np.clip(old_val + delta, -1.0, 1.0))
 
-                # Smidig nollpunkts-passage: snäpp till 0.0 om man passerar nollan
-                if (old_val < 0 and new_val > 0) or (old_val > 0 and new_val < 0):
+                # Smidig nollpunkts-passage: snäpp till 0.0 om man korsar nollan
+                if (old_val < -0.01 and new_val >= 0.0) or (old_val > 0.01 and new_val <= 0.0):
                     self.dj_filter_val = 0.0
-                elif abs(new_val) < 0.015:
+                elif abs(new_val) < 0.01:
                     self.dj_filter_val = 0.0
                 else:
                     self.dj_filter_val = new_val
@@ -656,7 +656,7 @@ class TapeEngine:
                     out = self.tape.read_interp(pos)
 
                 # Applicera Cytomic resonant DJ State Variable Filter
-                if _libdsp is not None and abs(self.dj_filter_val) >= 0.02:
+                if _libdsp is not None and abs(self.dj_filter_val) >= 0.01:
                     out = np.ascontiguousarray(out, dtype=np.float32)
                     ptr = out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
                     _libdsp.svf_filter_block(ctypes.byref(self.dj_svf_state), ptr, frames_needed, ctypes.c_float(self.dj_filter_val))

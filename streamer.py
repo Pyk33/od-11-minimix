@@ -814,7 +814,7 @@ def render_dj_view(d, s, t):
 
     if is_brake:
         stat = "[BRAKE]"
-    elif abs(filt_val) < 0.02:
+    elif abs(filt_val) < 0.01:
         stat = "CLEAN"
     elif filt_val < 0:
         stat = f"LPF {int(abs(filt_val)*100)}%"
@@ -834,7 +834,7 @@ def render_dj_view(d, s, t):
 
     for px in range(bx0 + 1, bx1):
         rel_x = (px - bx0) / float(w_box)
-        if abs(filt_val) < 0.02:
+        if abs(filt_val) < 0.01:
             resp = 0.7 + 0.08 * math.sin(rel_x * 9.0 + t * 4.0)
         elif filt_val < 0:
             cutoff_rel = 1.0 - abs(filt_val) * 0.85
