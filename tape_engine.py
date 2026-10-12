@@ -391,10 +391,10 @@ class TapeEngine:
         with self._lock:
             self.dj_trans_switched = True
 
-    def start_dj_transition(self, duration_s: Optional[float] = None):
+    def start_dj_transition(self, duration_s: Optional[float] = None, from_loop: bool = False):
         """
         Startar en takt- och energinivåsynkad DJ Smart Transition:
-        1. Behåller Track 1 i full volym i sitt musikaliska groove medan Spotify hämtar nästa låt.
+        1. Behåller Track 1 (antingen aktiv loop eller låtens groove) i full volym medan Spotify hämtar nästa låt.
         2. Övervakar inkommande ljudström tills Track 2 faktiskt har laddats och sökts in ~18 sekunder.
         3. Finner taktslag (beats/takt) och matchar energinivån.
         4. Lanserar en lång, mjuk crossfade (4 takter, ~7.5s) på taktslaget med LPF-basgroove och HPF-insvep.
@@ -406,18 +406,33 @@ class TapeEngine:
             self.dj_trans_t2_detected_time = 0.0
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
 
-            # Analysera Track 1 för BPM och taktlängd runt uppspelningspunkten
-            anchor = int(self.head_pos if not self.is_live else live_edge)
-            loop_start, loop_len, bpm = self._detect_natural_loop(anchor)
-            self.dj_trans_bpm = bpm
-            self.dj_trans_beat_frames = int((60.0 / max(60.0, min(200.0, bpm))) * self.sr)
-            self.dj_trans_bar_frames = max(self.dj_trans_beat_frames * 4, int(1.2 * self.sr))
+            if from_loop or (self.mode == self.MODE_LOOP and self.loop_active):
+                # Använd den aktiva loopen som Track 1
+                self.dj_trans_bpm = getattr(self, "loop_bpm", 120.0)
+                self.dj_trans_beat_frames = getattr(self, "loop_beat_frames", int(0.5 * self.sr))
+                self.dj_trans_bar_frames = getattr(self, "loop_bar_frames", int(2.0 * self.sr))
+                self.dj_trans_track1_head = self.head_pos
+                self.dj_trans_t1_start = self.loop_start_pos
+                self.dj_trans_t1_len = max(256, self.loop_frames)
+                rel_head = (self.head_pos - self.loop_start_pos) % self.tape.max_frames
+                self.dj_trans_t1_phase = int(rel_head % self.dj_trans_t1_len)
+            else:
+                # Analysera Track 1 för BPM och taktlängd runt uppspelningspunkten
+                anchor = int(self.head_pos if not self.is_live else live_edge)
+                loop_start, loop_len, bpm = self._detect_natural_loop(anchor)
+                self.dj_trans_bpm = bpm
+                self.dj_trans_beat_frames = int((60.0 / max(60.0, min(200.0, bpm))) * self.sr)
+                self.dj_trans_bar_frames = max(self.dj_trans_beat_frames * 4, int(1.2 * self.sr))
 
-            # Förankra Track 1: börja exakt från nuvarande uppspelningspunkt (0 ms hopp)
-            self.dj_trans_track1_head = self.head_pos
-            self.dj_trans_t1_start = loop_start
-            self.dj_trans_t1_len = self.dj_trans_bar_frames
-            self.dj_trans_t1_phase = int((anchor - loop_start) % self.dj_trans_t1_len)
+                # Förankra Track 1: börja exakt från nuvarande uppspelningspunkt (0 ms hopp)
+                self.dj_trans_track1_head = self.head_pos
+                self.dj_trans_t1_start = loop_start
+                self.dj_trans_t1_len = self.dj_trans_bar_frames
+                self.dj_trans_t1_phase = int((anchor - loop_start) % self.dj_trans_t1_len)
+
+            # Byt internt läge till DJ så att transition-processorn körs
+            self.mode = self.MODE_DJ
+            self.loop_active = False
 
             calc_dur = 4.0 * (self.dj_trans_bar_frames / float(self.sr))
             self.dj_trans_duration_s = float(duration_s) if duration_s is not None else max(6.5, min(9.0, calc_dur))

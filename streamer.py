@@ -466,7 +466,10 @@ def on_btn_play_long():
         touch()
     elif m == "LOOP":
         if tape:
-            tape.loop_reverse = not tape.loop_reverse
+            tape.start_dj_transition(from_loop=True)
+            with lock:
+                state["mode"] = "DJ"
+            do_dj_next(seek_s=18.0)
         touch()
     elif m == "DJ":
         if tape:
@@ -835,8 +838,7 @@ def render_loop_view(d, s, t):
         d.line([(sx, box_y1 - 3), (sx, box_y1 - 1)], fill=255)
 
     # 2. Text under loopen: Taktlängd och BPM
-    rev_str = " REV" if (tape and getattr(tape, "loop_reverse", False)) else ""
-    info_str = f"{loop_name}  {int(round(loop_bpm))}BPM{rev_str}"
+    info_str = f"{loop_name}  {int(round(loop_bpm))}BPM"
     d.text((4, 34), info_str, font=F_XS, fill=255)
 
     # 3. Låtens tidslinje (Timeline) med loopen som ett intervall/box på tidslinjen
@@ -888,7 +890,7 @@ def render_loop_view(d, s, t):
     loop_items = [
         ("rot", edit_mode),
         ("top_tap", "SWAP"),
-        ("top_hold", "REV"),
+        ("top_hold", "XFADE"),
         ("btm_tap", "DJ"),
         ("btm_hold", "VOL"),
     ]
