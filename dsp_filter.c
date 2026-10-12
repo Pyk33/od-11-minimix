@@ -28,7 +28,7 @@ typedef struct {
  *               positive: High-Pass Filter (HPF) sweeping up
  */
 void svf_filter_block(SVFState *state, float *in_out, int frames, float filter_val) {
-    if (fabsf(filter_val) < 0.01f) {
+    if (fabsf(filter_val) < 0.005f) {
         // Clean Bypass: no computation needed
         return;
     }
