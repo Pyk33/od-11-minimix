@@ -384,6 +384,7 @@ def on_btn_play_short():
         touch()
     elif m == "DJ":
         if tape:
+            tape.trigger_dj_brake(False)
             tape.reset_dj_filter()
         touch()
 
@@ -409,7 +410,16 @@ def on_btn_play_long():
         touch()
     elif m == "DJ":
         if tape:
-            tape.trigger_dj_brake()
+            tape.trigger_dj_brake(True)
+        touch()
+
+
+def on_btn_play_release():
+    with lock:
+        m = state["mode"]
+    if m == "DJ":
+        if tape:
+            tape.trigger_dj_brake(False)
         touch()
 
 
@@ -455,9 +465,9 @@ combo_active = False   # sant medan båda knapparna hålls ned (enskilda åtgär
 class LongShortButton:
     """Kort tryck vid släpp, långt tryck triggas medan knappen hålls."""
 
-    def __init__(self, pin, short, long_):
+    def __init__(self, pin, short, long_, release_long=None):
         self.btn = Button(pin, pull_up=True, bounce_time=0.03, hold_time=LONG_PRESS_S)
-        self.short, self.long_ = short, long_
+        self.short, self.long_, self.release_long = short, long_, release_long
         self._held = False
         self.btn.when_held = self._on_held
         self.btn.when_released = self._on_release
@@ -468,7 +478,10 @@ class LongShortButton:
             self.long_()
 
     def _on_release(self):
-        if not self._held and not combo_active:
+        if self._held:
+            if self.release_long and not combo_active:
+                self.release_long()
+        elif not combo_active:
             self.short()
         self._held = False
 
@@ -801,7 +814,7 @@ def render_dj_view(d, s, t):
 
     if is_brake:
         stat = "[BRAKE]"
-    elif abs(filt_val) < 0.04:
+    elif abs(filt_val) < 0.02:
         stat = "CLEAN"
     elif filt_val < 0:
         stat = f"LPF {int(abs(filt_val)*100)}%"
@@ -821,7 +834,7 @@ def render_dj_view(d, s, t):
 
     for px in range(bx0 + 1, bx1):
         rel_x = (px - bx0) / float(w_box)
-        if abs(filt_val) < 0.04:
+        if abs(filt_val) < 0.02:
             resp = 0.7 + 0.08 * math.sin(rel_x * 9.0 + t * 4.0)
         elif filt_val < 0:
             cutoff_rel = 1.0 - abs(filt_val) * 0.85
@@ -1013,7 +1026,7 @@ def main():
     encoder = RotaryEncoder(ENC_PIN_A, ENC_PIN_B, max_steps=0, wrap=False)
     encoder.when_rotated = lambda: on_rotated()
     buttons = [
-        LongShortButton(BTN_PLAY_PAUSE, on_btn_play_short, on_btn_play_long),
+        LongShortButton(BTN_PLAY_PAUSE, on_btn_play_short, on_btn_play_long, on_btn_play_release),
         LongShortButton(BTN_NEXT, on_btn_next_short, on_btn_next_long),
     ]
 

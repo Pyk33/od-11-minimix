@@ -209,6 +209,7 @@ class TapeEngine:
             elif new_mode == self.MODE_DJ:
                 # Gå in i DJ: nollställ broms, fortsätt spela sömlöst
                 self.dj_brake_active = False
+                self.speed = 1.0
                 self._pending_tape_steps = 0
 
     def cycle_mode(self) -> str:
@@ -227,7 +228,7 @@ class TapeEngine:
         """Sätt DJ-filtrets läge (-1.0 = Max LPF, 0.0 = Clean Bypass, +1.0 = Max HPF)."""
         with self._lock:
             self.dj_filter_val = float(np.clip(val, -1.0, 1.0))
-            if abs(self.dj_filter_val) < 0.03:
+            if abs(self.dj_filter_val) < 0.015:
                 self.dj_filter_val = 0.0
 
     def reset_dj_filter(self):
@@ -336,9 +337,18 @@ class TapeEngine:
 
             elif self.mode == self.MODE_DJ:
                 # Ratten styr bi-polärt DJ-filter (-1.0 LPF .. 0.0 Clean .. +1.0 HPF)
-                self.dj_filter_val = float(np.clip(self.dj_filter_val + steps * 0.015, -1.0, 1.0))
-                if abs(self.dj_filter_val) < 0.03:
+                # 0.04 per steg ger ca 25 klick för ett komplett svep från neutral till max
+                old_val = self.dj_filter_val
+                delta = steps * 0.04
+                new_val = float(np.clip(old_val + delta, -1.0, 1.0))
+
+                # Smidig nollpunkts-passage: snäpp till 0.0 om man passerar nollan
+                if (old_val < 0 and new_val > 0) or (old_val > 0 and new_val < 0):
                     self.dj_filter_val = 0.0
+                elif abs(new_val) < 0.015:
+                    self.dj_filter_val = 0.0
+                else:
+                    self.dj_filter_val = new_val
 
     def get_loop_progress(self) -> float:
         """Exakt fasindikator (0.0 till 1.0) för synkad skärmanimering."""
@@ -628,6 +638,16 @@ class TapeEngine:
                 if self.is_live and self.speed >= 0.99:
                     pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
                     self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+
+                    dist = (live_edge - self.head_pos) % self.tape.max_frames
+                    if dist > self.tape.max_frames / 2:
+                        dist -= self.tape.max_frames
+                    if abs(dist) > int(0.5 * self.sr):
+                        self.head_pos = live_edge
+                    elif abs(dist) > 150:
+                        nudge = np.clip(dist * 0.005, -1.5, 1.5)
+                        self.head_pos = (self.head_pos + nudge) % self.tape.max_frames
+
                     out = self.tape.read_interp(pos)
                 else:
                     step_frames = frames_needed * self.speed
