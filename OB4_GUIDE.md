@@ -63,9 +63,10 @@ En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz s
 Fångar omedelbart en slinga av musiken och upprepar den med klickfria equal-power crossfades.
 
 - **Display:** 
-  - Topprad: `LOOP` märke till vänster och aktivt encoder-läge (`SIZE` eller `MOVE`) till höger.
+  - Topprad: `LOOP` märke till vänster och båda lägena till höger med det aktiva markerat: `[SIZE] MOVE` eller `SIZE [MOVE]`.
   - Mitten: Loop-fönster med faslåst playhead och taktnischer som rör sig i perfekt synk med ljudet.
-  - Under loopen: `LEN: <längd>` (hur mycket vi loopar, inkl. `REV`) samt `AT: <tid>` (var i låten vi loopar, t.ex. `AT: 01:45` eller `AT: -00:15`).
+  - Under loopen: `LEN: <längd>` (hur mycket vi loopar, inkl. `REV`).
+  - Nederst: **Låtens tidslinje (Timeline)** där loopen visas som en interaktiv box `[ ■ ]`. När du vrider i `MOVE` glider boxen längs låtens tidslinje, och i `SIZE` expanderar/krymper boxen!
 - **Höger kommandokolumn (sidebar):**
   - `◎ SIZE/MOVE`: Rattstyrning (ändra looplängd eller flytta loopfönstret).
   - `▲ SWAP`: Kort tryck på övre knappen växlar ratten mellan `SIZE` och `MOVE`.
