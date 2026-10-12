@@ -356,10 +356,10 @@ def do_next():
     player_cmd("/player/next", "next")
 
 
-def do_dj_next(seek_s: float = 10.0):
+def do_dj_next(seek_s: float = 18.0):
     """
-    DJ Smart Transition: Byter till nästa låt och hoppar direkt ~10 sekunder in
-    så att crossfaden landar i ett aktivt beat/groove istället för en tyst intro.
+    DJ Smart Transition: Byter till nästa låt och hoppar direkt ~18 sekunder in
+    så att crossfaden landar djupt i låtens aktiva beat/groove istället för ett tyst intro.
     """
     def run():
         with lock:
@@ -380,16 +380,16 @@ def do_dj_next(seek_s: float = 10.0):
         # Hoppa till nästa låt på Spotify
         api_call("POST", "/player/next")
 
-        # Vänta på att go-librespot byter track URI och sök direkt till ~10s
+        # Vänta på att go-librespot byter track URI och sök direkt till ~18s
         start_t = time.monotonic()
-        while time.monotonic() - start_t < 3.5:
+        while time.monotonic() - start_t < 4.0:
             time.sleep(0.04)
             s1 = api_call("GET", "/status") or {}
             t1 = s1.get("track") or {}
             uri1 = t1.get("uri")
             if uri1 and uri1 != uri0:
                 dur = t1.get("duration") or 180000
-                seek_ms = int(seek_s * 1000) if dur > (seek_s * 2000) else int(dur * 0.1)
+                seek_ms = int(seek_s * 1000) if dur > (seek_s * 2000) else int(dur * 0.15)
                 api_call("POST", "/player/seek", {"position": seek_ms})
                 with lock:
                     state["pos_ms"] = seek_ms
@@ -443,7 +443,7 @@ def on_btn_play_short():
                 tape.end_dj_transition()
             else:
                 tape.start_dj_transition()
-                do_dj_next(seek_s=10.0)
+                do_dj_next(seek_s=18.0)
         touch()
 
 
@@ -801,6 +801,15 @@ def render_tape_view(d, s, t):
 def render_loop_view(d, s, t):
     loop_sec = tape.loop_length_s if tape else 2.0
     edit_mode = getattr(tape, "loop_edit_mode", "SIZE") if tape else "SIZE"
+    loop_name = tape.get_loop_label() if (tape and hasattr(tape, "get_loop_label")) else (
+        getattr(tape, "loop_name", "1 BAR") if tape else "1 BAR"
+    )
+    loop_bpm = tape.get_loop_bpm() if (tape and hasattr(tape, "get_loop_bpm")) else (
+        getattr(tape, "loop_bpm", 120.0) if tape else 120.0
+    )
+    loop_beats = tape.get_loop_beats() if (tape and hasattr(tape, "get_loop_beats")) else (
+        getattr(tape, "loop_beats", 4.0) if tape else 4.0
+    )
 
     # Header: LOOP märke till vänster, BÅDE [SIZE] och MOVE tydligt indikerade till höger
     d.rectangle([0, 0, 22, 9], fill=255)
@@ -819,15 +828,16 @@ def render_loop_view(d, s, t):
     head_x = box_x0 + frac * (box_x1 - box_x0)
     d.line([(head_x, box_y0 + 2), (head_x, box_y1 - 2)], fill=255, width=2)
 
-    for seg in range(1, 4):
-        sx = box_x0 + seg * (box_x1 - box_x0) / 4.0
+    # Taktindelningar (beats) inne i loop-boxen
+    num_subdiv = int(loop_beats) if (1 < loop_beats <= 8) else 4
+    for seg in range(1, num_subdiv):
+        sx = box_x0 + seg * (box_x1 - box_x0) / float(num_subdiv)
         d.line([(sx, box_y1 - 3), (sx, box_y1 - 1)], fill=255)
 
-    # 2. Text under loopen: Loop-längd
-    sec_str = f"{loop_sec:.3f}s" if loop_sec < 0.5 else (f"{loop_sec:.2f}s" if loop_sec < 1.0 else f"{loop_sec:.1f}s")
-    if tape and getattr(tape, "loop_reverse", False):
-        sec_str += " REV"
-    d.text((4, 34), f"LEN: {sec_str}", font=F_XS, fill=255)
+    # 2. Text under loopen: Taktlängd och BPM
+    rev_str = " REV" if (tape and getattr(tape, "loop_reverse", False)) else ""
+    info_str = f"{loop_name}  {int(round(loop_bpm))}BPM{rev_str}"
+    d.text((4, 34), info_str, font=F_XS, fill=255)
 
     # 3. Låtens tidslinje (Timeline) med loopen som ett intervall/box på tidslinjen
     behind_sec = tape.get_loop_behind_live_sec() if (tape and hasattr(tape, "get_loop_behind_live_sec")) else (

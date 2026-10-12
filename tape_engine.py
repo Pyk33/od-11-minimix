@@ -151,6 +151,16 @@ class TapeEngine:
     MODE_LOOP = "LOOP"        # Instant Looper: Framåt expansion & glidande tidsfönster
     MODE_DJ = "DJ"            # DJ Mixer: Resonant Bi-polar DJ Filter & Turntable Brake
 
+    LOOP_BEAT_PRESETS = [
+        (0.25, "1/4 BEAT"),
+        (0.5,  "1/2 BEAT"),
+        (1.0,  "1 BEAT"),
+        (2.0,  "2 BEATS"),
+        (4.0,  "1 BAR"),      # 1 hel takt (4 beats)
+        (8.0,  "2 BARS"),     # 2 takter
+        (16.0, "4 BARS"),     # 4 takter
+        (32.0, "8 BARS"),     # 8 takter
+    ]
     LOOP_PRESETS = [0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0]
 
     def __init__(self, sample_rate: int = SAMPLE_RATE, tape_minutes: int = DEFAULT_TAPE_MINUTES):
@@ -181,13 +191,20 @@ class TapeEngine:
         self.dj_merge_svf = _SVFState()
         self.tape_spool_svf = _SVFState()
 
-        # Instant Looper state
+        # Instant Looper state (Beats & Bars / Takter)
         self.loop_active = False
-        self.loop_length_s = 2.0
+        self.loop_bpm = 120.0
+        self.loop_beat_frames = int(0.5 * sample_rate)
+        self.loop_bar_frames = int(2.0 * sample_rate)
+        self.loop_preset_idx = 4  # Standard: 1 BAR (1 takt = 4 beats)
+        self.loop_beats = 4.0
+        self.loop_name = "1 BAR"
+        self.loop_frames = int(4.0 * self.loop_beat_frames)
+        self.loop_length_s = self.loop_frames / float(sample_rate)
         self.loop_start_pos = 0.0
         self.loop_end_pos = 0.0
         self.loop_reverse = False
-        self.loop_edit_mode = "SIZE"    # "SIZE" (ändra längd framåt) eller "MOVE" (flytta loopen)
+        self.loop_edit_mode = "SIZE"    # "SIZE" (ändra längd i takter) eller "MOVE" (flytta takt för takt)
         self._loop_accum = 0
 
         # DJ Filter & Turntable Brake state
@@ -199,8 +216,8 @@ class TapeEngine:
         # Auto DJ Smart Transition state (Beat-Matched DJ Transition Engine)
         self.is_dj_transition = False
         self.dj_trans_state = "IDLE"          # "WAIT_AUDIO", "ALIGN_BEAT", "CROSSFADING"
-        self.dj_trans_duration_s = 4.0
-        self.dj_trans_frames = int(4.0 * sample_rate)
+        self.dj_trans_duration_s = 7.5        # Lång, proffsig övergång över 4 takter (~7.5s)
+        self.dj_trans_frames = int(7.5 * sample_rate)
         self.dj_trans_pos = 0
         self.dj_trans_progress = 0.0
         self.dj_trans_bpm = 120.0
@@ -211,8 +228,9 @@ class TapeEngine:
         self.dj_trans_t1_len = int(2.0 * sample_rate)
         self.dj_trans_t1_phase = 0
         self.dj_trans_switched = False
+        self.dj_trans_t2_detected_time = 0.0
         self.dj_trans_wait_start = 0.0
-        self.dj_trans_wait_timeout = 5.0
+        self.dj_trans_wait_timeout = 6.5
         self.dj_trans_svf_t1 = _SVFState()
         self.dj_trans_svf_t2 = _SVFState()
         self.dj_trans_echo_state = _EchoState()
@@ -249,15 +267,29 @@ class TapeEngine:
                 self.loop_active = False
 
             elif new_mode == self.MODE_LOOP:
-                # Fånga slinga från nuvarande uppspelningsposition
+                # Fånga slinga från nuvarande uppspelningsposition med naturlig takt/beat-detektering
                 self.loop_active = True
                 self.tape_stop_active = False
-                frames = int(self.loop_length_s * self.sr)
-                self.loop_start_pos = (self.head_pos - frames) % self.tape.max_frames
-                self.loop_end_pos = self.head_pos
+                self.dj_brake_active = False
                 self.loop_edit_mode = "SIZE"
                 self._loop_accum = 0
-                self.dj_brake_active = False
+
+                anchor = int(self.head_pos)
+                loop_start, bar_len, bpm = self._detect_natural_loop(anchor)
+                self.loop_bpm = bpm
+                self.loop_beat_frames = max(int(0.20 * self.sr), int(bar_len // 4))
+                self.loop_bar_frames = 4 * self.loop_beat_frames
+
+                # Standard: 1 BAR (4 beats)
+                self.loop_preset_idx = 4
+                self.loop_beats = 4.0
+                self.loop_name = "1 BAR"
+                self.loop_frames = self.loop_bar_frames
+                self.loop_length_s = self.loop_frames / float(self.sr)
+
+                self.loop_start_pos = loop_start
+                self.loop_end_pos = (loop_start + self.loop_frames) % self.tape.max_frames
+                self.head_pos = self.loop_start_pos
 
             elif new_mode == self.MODE_DJ:
                 # Gå in i DJ: nollställ broms, fortsätt spela sömlöst
@@ -297,23 +329,23 @@ class TapeEngine:
                 self.dj_brake_active = bool(active)
             return self.dj_brake_active
 
-    def _detect_natural_loop(self, live_edge: int) -> tuple[int, int, float]:
+    def _detect_natural_loop(self, anchor_pos: int) -> tuple[int, int, float]:
         """
-        Analyserar de senaste 3.5 sekunderna i bandbufferten för att hitta
+        Analyserar de senaste 3.5 sekunderna i bandbufferten före anchor_pos för att hitta
         låtens naturliga BPM och taktlängd (1 bar = 4 beats) synkad till taktslag.
-        Returnerar (loop_start, loop_len_frames, bpm).
+        Returnerar (loop_start, bar_len_frames, bpm).
         """
         SEARCH_S = 3.5
         n_search = int(SEARCH_S * self.sr)
-        pos = (live_edge - n_search + np.arange(n_search)) % self.tape.max_frames
+        pos = (anchor_pos - n_search + np.arange(n_search)) % self.tape.max_frames
         raw = self.tape.read_interp(pos)
         mono = 0.5 * (raw[:, 0] + raw[:, 1])
 
-        hop = int(self.sr * 0.010)  # 10 ms upplösning
+        hop = int(self.sr * 0.010)  # 10 ms upplösning = 480 samples vid 48 kHz
         n_frames = len(mono) // hop
         if n_frames < 100:
             fallback = int(2.0 * self.sr)
-            return (live_edge - fallback) % self.tape.max_frames, fallback, 120.0
+            return (anchor_pos - fallback) % self.tape.max_frames, fallback, 120.0
 
         mono_frames = mono[:n_frames * hop].reshape(n_frames, hop)
         energy = np.mean(mono_frames ** 2, axis=1)
@@ -325,36 +357,36 @@ class TapeEngine:
             if std > 1e-6:
                 onset_norm /= std
 
-            # Sök BPM mellan 85 och 165 (lag 36..71 frames)
-            min_lag = int(0.36 * 100)
-            max_lag = int(0.71 * 100)
+            # Sök BPM mellan 75 och 180 (lag 33..80 frames vid 10ms hop)
+            min_lag = int(0.33 * 100)
+            max_lag = int(0.80 * 100)
             corr = np.correlate(onset_norm, onset_norm, mode='full')
             center = len(onset_norm) - 1
             search_corr = corr[center + min_lag : center + max_lag + 1]
 
             if len(search_corr) > 0 and float(np.max(search_corr)) > 0.08:
                 best_lag = min_lag + int(np.argmax(search_corr))
-                bpm = float(np.clip(60.0 / (best_lag * 0.010), 80.0, 175.0))
+                bpm = float(np.clip(60.0 / (best_lag * 0.010), 75.0, 180.0))
                 beat_frames = best_lag * hop
-                # 1 bar = 4 beats. Om 1 bar är kort (<1.4s vid snabb musik), använd 2 bars = 8 beats
                 bar_frames = 4 * beat_frames
-                if bar_frames < int(1.4 * self.sr):
-                    bar_frames *= 2
 
                 # Fashitta: hitta starkaste taktslag
                 phase_scores = [float(np.sum(onset[shift::best_lag])) for shift in range(min(best_lag, len(onset)))]
                 best_phase = int(np.argmax(phase_scores))
-                phase_samples = best_phase * hop
 
-                loop_len = bar_frames
-                loop_start = (live_edge - loop_len) % self.tape.max_frames
-                return loop_start, loop_len, bpm
+                # Hitta senaste taktslag före anchor_pos
+                k_last = best_phase + int((len(onset) - 1 - best_phase) // best_lag) * best_lag
+                offset_samples = int((len(onset) - 1 - k_last) * hop)
+
+                loop_end = (anchor_pos - offset_samples) % self.tape.max_frames
+                loop_start = (loop_end - bar_frames) % self.tape.max_frames
+                return loop_start, bar_frames, bpm
 
         fallback_len = int(2.0 * self.sr)
-        return (live_edge - fallback_len) % self.tape.max_frames, fallback_len, 120.0
+        return (anchor_pos - fallback_len) % self.tape.max_frames, fallback_len, 120.0
 
     def notify_track_switched(self):
-        """Anropas av streamer när nästa låt har laddats och sökts till ~10s."""
+        """Anropas av streamer när nästa låt har laddats och sökts till ~18s."""
         with self._lock:
             self.dj_trans_switched = True
 
@@ -362,18 +394,20 @@ class TapeEngine:
         """
         Startar en takt- och energinivåsynkad DJ Smart Transition:
         1. Behåller Track 1 i full volym i sitt musikaliska groove medan Spotify hämtar nästa låt.
-        2. Övervakar inkommande ljudström tills Track 2 faktiskt har laddats och sökts in ~10 sekunder.
+        2. Övervakar inkommande ljudström tills Track 2 faktiskt har laddats och sökts in ~18 sekunder.
         3. Finner taktslag (beats/takt) och matchar energinivån.
-        4. Lanserar crossfade på taktslaget med LPF-basgroove och HPF-insvep.
+        4. Lanserar en lång, mjuk crossfade (4 takter, ~7.5s) på taktslaget med LPF-basgroove och HPF-insvep.
         """
         with self._lock:
             self.is_dj_transition = True
             self.dj_trans_state = "WAIT_AUDIO"
             self.dj_trans_switched = False
+            self.dj_trans_t2_detected_time = 0.0
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
 
-            # Analysera Track 1 för BPM och taktlängd
-            loop_start, loop_len, bpm = self._detect_natural_loop(live_edge)
+            # Analysera Track 1 för BPM och taktlängd runt uppspelningspunkten
+            anchor = int(self.head_pos if not self.is_live else live_edge)
+            loop_start, loop_len, bpm = self._detect_natural_loop(anchor)
             self.dj_trans_bpm = bpm
             self.dj_trans_beat_frames = int((60.0 / max(60.0, min(200.0, bpm))) * self.sr)
             self.dj_trans_bar_frames = max(self.dj_trans_beat_frames * 4, int(1.2 * self.sr))
@@ -382,14 +416,15 @@ class TapeEngine:
             self.dj_trans_track1_head = self.head_pos
             self.dj_trans_t1_start = loop_start
             self.dj_trans_t1_len = self.dj_trans_bar_frames
-            self.dj_trans_t1_phase = int((live_edge - loop_start) % self.dj_trans_t1_len)
+            self.dj_trans_t1_phase = int((anchor - loop_start) % self.dj_trans_t1_len)
 
-            self.dj_trans_duration_s = float(duration_s) if duration_s is not None else 4.0
+            calc_dur = 4.0 * (self.dj_trans_bar_frames / float(self.sr))
+            self.dj_trans_duration_s = float(duration_s) if duration_s is not None else max(6.5, min(9.0, calc_dur))
             self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
             self.dj_trans_pos = 0
             self.dj_trans_progress = 0.0
             self.dj_trans_wait_start = time.monotonic()
-            self.dj_trans_wait_timeout = 5.0  # Max väntetid i sekunder innan tvångsstart
+            self.dj_trans_wait_timeout = 7.0  # Generös timeout för att vänta in Spotify-sökning och stabil audio
             self.dj_trans_svf_t1 = _SVFState()
             self.dj_trans_svf_t2 = _SVFState()
             if _libdsp is not None and hasattr(_libdsp, "echo_init"):
@@ -472,43 +507,57 @@ class TapeEngine:
 
             elif self.mode == self.MODE_LOOP:
                 if self.loop_edit_mode == "SIZE":
-                    # KRAV 2: Lägg till tid FRAMÅT i loopen!
+                    # Ändra looplängd i musikaliska beats och takter (1/4 BEAT .. 8 BARS)
                     self._loop_accum += steps
-                    THRESHOLD = 20  # Känsligare respons för stor rotor/ratt
+                    THRESHOLD = 18  # Tydligt snäpp per klick/detent på encodern
                     if abs(self._loop_accum) >= THRESHOLD:
                         direction = 1 if self._loop_accum > 0 else -1
                         self._loop_accum = 0
 
-                        curr_idx = min(range(len(self.LOOP_PRESETS)),
-                                       key=lambda i: abs(self.LOOP_PRESETS[i] - self.loop_length_s))
-                        new_idx = max(0, min(len(self.LOOP_PRESETS) - 1, curr_idx + direction))
-                        self.loop_length_s = self.LOOP_PRESETS[new_idx]
-                        frames = int(self.loop_length_s * self.sr)
+                        new_idx = max(0, min(len(self.LOOP_BEAT_PRESETS) - 1, self.loop_preset_idx + direction))
+                        self.loop_preset_idx = new_idx
+                        beats, label = self.LOOP_BEAT_PRESETS[new_idx]
+                        self.loop_beats = beats
+                        self.loop_name = label
+                        self.loop_frames = max(256, int(beats * self.loop_beat_frames))
+                        self.loop_length_s = self.loop_frames / float(self.sr)
 
-                        # Håll loop_start_pos förankrad och expandera loop_end_pos framåt
-                        new_end = (self.loop_start_pos + frames) % self.tape.max_frames
+                        # Håll loop_start_pos förankrad och expandera/krymp loop_end_pos
+                        new_end = (self.loop_start_pos + self.loop_frames) % self.tape.max_frames
                         behind_end = (live_edge - new_end) % self.tape.max_frames
                         if behind_end > self.tape.max_frames / 2: # passerade live in i framtiden
                             self.loop_end_pos = live_edge
-                            self.loop_start_pos = (live_edge - frames) % self.tape.max_frames
+                            self.loop_start_pos = (live_edge - self.loop_frames) % self.tape.max_frames
                         else:
                             self.loop_end_pos = new_end
 
-                elif self.loop_edit_mode == "MOVE":
-                    # KRAV 2b: Flytta hela loopfönstret längs musikhistorien!
-                    shift = steps * SAMPLES_PER_STEP * 3
-                    new_start = (self.loop_start_pos + shift) % self.tape.max_frames
-                    new_end = (self.loop_end_pos + shift) % self.tape.max_frames
+                        # Säkerställ att head_pos hålls inom det nya loopintervallet
+                        rel = (self.head_pos - self.loop_start_pos) % self.tape.max_frames
+                        self.head_pos = (self.loop_start_pos + (rel % self.loop_frames)) % self.tape.max_frames
 
-                    behind_end = (live_edge - new_end) % self.tape.max_frames
-                    if behind_end > self.tape.max_frames / 2: # kan inte flytta förbi LIVE
-                        frames = int(self.loop_length_s * self.sr)
-                        self.loop_end_pos = live_edge
-                        self.loop_start_pos = (live_edge - frames) % self.tape.max_frames
-                    else:
-                        self.loop_start_pos = new_start
-                        self.loop_end_pos = new_end
-                        self.head_pos = (self.head_pos + shift) % self.tape.max_frames
+                elif self.loop_edit_mode == "MOVE":
+                    # Skifta mellan naturliga loopsekvenser i låten (1 hel takt eller 1 beat per snäpp)
+                    self._loop_accum += steps
+                    THRESHOLD = 18
+                    if abs(self._loop_accum) >= THRESHOLD:
+                        num_steps = int(self._loop_accum // THRESHOLD) if self._loop_accum > 0 else int(-((-self._loop_accum) // THRESHOLD))
+                        self._loop_accum -= num_steps * THRESHOLD
+
+                        # Skifta med 1 hel takt (4 beats) om loopen är >= 1 takt, annars 1 beat
+                        shift_unit = self.loop_bar_frames if self.loop_beats >= 4.0 else self.loop_beat_frames
+                        shift = num_steps * shift_unit
+
+                        new_start = (self.loop_start_pos + shift) % self.tape.max_frames
+                        new_end = (self.loop_end_pos + shift) % self.tape.max_frames
+
+                        behind_end = (live_edge - new_end) % self.tape.max_frames
+                        if behind_end > self.tape.max_frames / 2: # kan inte flytta förbi LIVE
+                            self.loop_end_pos = live_edge
+                            self.loop_start_pos = (live_edge - self.loop_frames) % self.tape.max_frames
+                        else:
+                            self.loop_start_pos = new_start
+                            self.loop_end_pos = new_end
+                            self.head_pos = (self.head_pos + shift) % self.tape.max_frames
 
             elif self.mode == self.MODE_DJ:
                 if self.is_dj_transition:
@@ -525,16 +574,28 @@ class TapeEngine:
                 else:
                     self.dj_filter_val = new_val
 
+    def get_loop_label(self) -> str:
+        with self._lock:
+            return getattr(self, "loop_name", "1 BAR")
+
+    def get_loop_bpm(self) -> float:
+        with self._lock:
+            return getattr(self, "loop_bpm", 120.0)
+
+    def get_loop_beats(self) -> float:
+        with self._lock:
+            return getattr(self, "loop_beats", 4.0)
+
     def get_loop_progress(self) -> float:
         """Exakt fasindikator (0.0 till 1.0) för synkad skärmanimering."""
         with self._lock:
             if self.mode != self.MODE_LOOP or not self.loop_active:
                 return 0.0
-            loop_len = int(self.loop_length_s * self.sr)
+            loop_len = self.loop_frames if hasattr(self, "loop_frames") and self.loop_frames > 0 else int(self.loop_length_s * self.sr)
             if loop_len <= 0:
                 return 0.0
             rel = (self.head_pos - self.loop_start_pos) % self.tape.max_frames
-            return float(np.clip(rel / loop_len, 0.0, 1.0))
+            return float(np.clip((rel % loop_len) / float(loop_len), 0.0, 1.0))
 
     def get_time_behind_live_sec(self) -> float:
         """Sekunder efter realtidsströmmen (visar 0.0 vid LIVE t-0)."""
@@ -867,14 +928,22 @@ class TapeEngine:
                     peak_live = float(np.max(np.abs(chunk_live)))
                     now = time.monotonic()
 
-                    # FAS 1: VÄNTA PÅ ATT NÄSTA LÅT BYTS, SÖKS TILL 10S OCH FAKTISKT HAR LJUD/ENERGI
+                    # FAS 1: VÄNTA PÅ ATT NÄSTA LÅT BYTS, SÖKS TILL ~18S OCH FAKTISKT HAR STABIL LJUD/ENERGI
                     if self.dj_trans_state == "WAIT_AUDIO":
                         track_ready = self.dj_trans_switched or (now - self.dj_trans_wait_start >= 1.5)
-                        has_audio = track_ready and (rms_live >= 0.012 or peak_live >= 0.035)
+                        has_audio = track_ready and (rms_live >= 0.018 or peak_live >= 0.045)
                         timed_out = (now - self.dj_trans_wait_start >= self.dj_trans_wait_timeout)
 
-                        if has_audio or timed_out:
+                        if has_audio:
+                            # Stabil audio-verifiering: vänta tills audio funnits i minst 0.35s så musiken verkligen kommit igång
+                            if self.dj_trans_t2_detected_time == 0.0:
+                                self.dj_trans_t2_detected_time = now
+                            elif now - self.dj_trans_t2_detected_time >= 0.35:
+                                self.dj_trans_state = "ALIGN_BEAT"
+                        elif timed_out:
                             self.dj_trans_state = "ALIGN_BEAT"
+                        else:
+                            self.dj_trans_t2_detected_time = 0.0
 
                         # Medan vi väntar: Spela Track 1 i sitt musikaliska groove med klubbasfilter (-0.20 LPF)
                         rel = self.dj_trans_t1_phase
@@ -908,7 +977,8 @@ class TapeEngine:
                             # NÄSTA TAKTSLAG TRÄFFAT! Starta crossfaden exakt på takten!
                             self.dj_trans_state = "CROSSFADING"
                             self.dj_trans_pos = 0
-                            self.dj_trans_duration_s = max(3.0, min(5.0, 2.0 * (self.dj_trans_bar_frames / float(self.sr))))
+                            calc_dur = 4.0 * (self.dj_trans_bar_frames / float(self.sr))
+                            self.dj_trans_duration_s = max(6.5, min(9.0, calc_dur))
                             self.dj_trans_frames = int(self.dj_trans_duration_s * self.sr)
 
                         rel = self.dj_trans_t1_phase
