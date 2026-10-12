@@ -112,6 +112,7 @@ state = {
     "mode": "VOL",      # "VOL" | "TAPE" | "LOOP"
     "loop_anchor_dur_ms": 0,
     "loop_anchor_live_song_ms": 0,
+    "cut_flash_until": 0.0,
 }
 stop_event = threading.Event()
 
@@ -460,6 +461,8 @@ def on_btn_play_long():
     elif m == "TAPE":
         if tape:
             tape.jump_to_live(dj_merge=False) # Långtryck = direkt klipp till LIVE utan fade
+            with lock:
+                state["cut_flash_until"] = time.monotonic() + 0.8
         touch()
     elif m == "LOOP":
         if tape:
@@ -711,16 +714,21 @@ def draw_control_sidebar(d, items):
 
 
 def render_tape_view(d, s, t):
+    now = time.monotonic()
     behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
     speed = tape.speed if tape else 1.0
     is_merging = getattr(tape, "is_dj_merging", False) if tape else False
     is_playing = s.get("playing", True)
+    is_cut_flash = now < s.get("cut_flash_until", 0.0)
 
     d.rectangle([0, 0, 30, 9], fill=255)
     d.text((2, 0), "TAPE", font=F_XS, fill=0)
 
-    if is_merging:
-        status = "MERGE"
+    if is_cut_flash:
+        status = "[CUT]"
+    elif is_merging:
+        merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+        status = f"MRG {int(merge_p * 100)}%"
     elif behind_sec < 0.08:
         status = "LIVE"
     else:
@@ -745,10 +753,22 @@ def render_tape_view(d, s, t):
     d.rectangle([38, 23, 46, 35], outline=255)
     d.line([(42, 25), (42, 33)], fill=255)
 
-    if not is_playing:
+    # Visuell Merge-progress bar under spolarna vid DJ Merge
+    if is_merging:
+        merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+        bx0, by0, bx1, by1 = 18, 42, 66, 46
+        d.rectangle([bx0, by0, bx1, by1], outline=255)
+        bar_w = int(merge_p * (bx1 - bx0 - 2))
+        if bar_w > 0:
+            d.rectangle([bx0 + 1, by0 + 1, bx0 + 1 + bar_w, by1 - 1], fill=255)
+
+    if is_cut_flash:
+        sp_str = "[CUT TO LIVE!]"
+    elif not is_playing:
         sp_str = "PAUSED"
     elif is_merging:
-        sp_str = "MERGING..."
+        merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+        sp_str = f"DJ MERGE {int(merge_p * 100)}%"
     elif behind_sec < 0.08:
         sp_str = "LIVE"
     elif abs(speed - 1.0) > 0.15:
@@ -757,18 +777,21 @@ def render_tape_view(d, s, t):
         sp_str = "PLAYING"
     d.text((2, 53), sp_str, font=F_XS, fill=255)
 
-    # 1 cm sidebar kontroller
-    if behind_sec > 0.08 and not is_merging:
-        top_tap = "LIVE"
+    # 1 cm sidebar kontroller: tydlig skillnad mellan MERGE (kort tryck) och CUT (långt tryck)
+    if behind_sec > 0.08:
+        top_tap = "MERGE"
+        top_hold = "CUT"
     elif not is_playing:
         top_tap = "PLAY"
+        top_hold = "MUTE"
     else:
         top_tap = "PAUS"
+        top_hold = "MUTE"
 
     tape_items = [
         ("rot", "SCRUB"),
         ("top_tap", top_tap),
-        ("top_hold", "CUT"),
+        ("top_hold", top_hold),
         ("btm_tap", "LOOP"),
         ("btm_hold", "VOL"),
     ]

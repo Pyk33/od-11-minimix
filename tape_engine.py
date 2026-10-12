@@ -176,8 +176,10 @@ class TapeEngine:
 
         # DJ Merge to LIVE (mjuk equal-power crossfade vid återgång till nutid)
         self.is_dj_merging = False
-        self.merge_fade_frames = int(0.85 * sample_rate)  # 850 ms DJ crossfade
+        self.merge_fade_frames = int(1.6 * sample_rate)  # 1.6 sekunder mjuk DJ Merge
         self.merge_fade_pos = 0
+        self.dj_merge_svf = _SVFState()
+        self.tape_spool_svf = _SVFState()
 
         # Instant Looper state
         self.loop_active = False
@@ -415,18 +417,26 @@ class TapeEngine:
             self.loop_edit_mode = "MOVE" if self.loop_edit_mode == "SIZE" else "SIZE"
             return self.loop_edit_mode
 
-    def jump_to_live(self, dj_merge: bool = True):
-        """Hoppar till LIVE. Om dj_merge=True sker en mjuk equal-power DJ-övergång."""
+    def get_merge_progress(self) -> float:
+        """Exakt progress (0.0 till 1.0) för DJ Merge to LIVE visualisering på skärmen."""
         with self._lock:
-            if self.is_live and not self.is_dj_merging:
-                return
+            if not self.is_dj_merging or self.merge_fade_frames <= 0:
+                return 0.0
+            return float(np.clip(self.merge_fade_pos / float(self.merge_fade_frames), 0.0, 1.0))
 
+    def jump_to_live(self, dj_merge: bool = True):
+        """
+        Hoppar till LIVE.
+        - dj_merge=True:  Mjuk equal-power DJ-övergång (1.6s) med klubbasfilter.
+        - dj_merge=False: Omedelbart hårt snitt (CUT) direkt till nutid utan fade.
+        """
+        with self._lock:
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
             behind = (live_edge - self.head_pos) % self.tape.max_frames
             behind_sec = behind / self.sr if behind < self.tape.max_frames / 2 else 0.0
 
-            if not dj_merge or behind_sec < 0.25:
-                # Omedelbart snitt om vi redan är extremt nära nutid
+            if not dj_merge or behind_sec < 0.20:
+                # Omedelbart hårt snitt (CUT) till nutid utan fade
                 self.head_pos = live_edge
                 self.is_live = True
                 self.is_dj_merging = False
@@ -436,6 +446,7 @@ class TapeEngine:
                 # Mjuk DJ Merge Crossfade!
                 self.is_dj_merging = True
                 self.merge_fade_pos = 0
+                self.dj_merge_svf = _SVFState()
 
     def on_encoder_rotated(self, steps: int):
         """
@@ -614,6 +625,14 @@ class TapeEngine:
                 gain_del = np.cos(fade_angle)[:, np.newaxis]
                 gain_live = np.sin(fade_angle)[:, np.newaxis]
 
+                # Mjukt LPF-svep på det fördröjda bandet: rullar av toppen medan live tar över
+                p_scalar = float(cur_p / max(1, fade_frames))
+                f_merge = float(np.clip(-0.15 - 0.70 * p_scalar, -0.90, 0.0))
+                if _libdsp is not None:
+                    audio_del = np.ascontiguousarray(audio_del, dtype=np.float32)
+                    ptr_del = audio_del.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                    _libdsp.svf_filter_block(ctypes.byref(self.dj_merge_svf), ptr_del, frames_needed, ctypes.c_float(f_merge))
+
                 mixed = audio_del * gain_del + audio_live * gain_live
 
                 self.merge_fade_pos += frames_needed
@@ -664,14 +683,20 @@ class TapeEngine:
                         # Användaren scratchar bakåt i musikhistorien från LIVE
                         self.is_live = False
                         rate = self._velocity_est
-                        gain = 1.5 if rate < 200 else (4.0 if rate < 600 else (12.0 if rate < 1200 else 25.0))
+                        gain = 1.4 if rate < 200 else (3.0 if rate < 600 else (8.0 if rate < 1200 else 16.0))
                         back_dist = abs(steps * int(SAMPLES_PER_STEP * gain))
-                        min_scratch = int(0.50 * self.sr)
+                        min_scratch = int(0.35 * self.sr)
                         back_dist = max(min_scratch, back_dist)
                         self.head_pos = (live_edge - back_dist) % self.tape.max_frames
-                        self.speed = float(np.clip(-back_dist / frames_needed, -6.0, -0.2))
+                        # Resamplingshastighet bakåt: musikalisk vinyl scratch (max -1.8x, inte -6.0x squeal)
+                        self.speed = float(np.clip(-0.4 - (rate / 600.0), -1.8, -0.3))
                         pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
-                        return self.tape.read_interp(pos)
+                        out = self.tape.read_interp(pos)
+                        if _libdsp is not None:
+                            out = np.ascontiguousarray(out, dtype=np.float32)
+                            ptr = out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                            _libdsp.svf_filter_block(ctypes.byref(self.tape_spool_svf), ptr, frames_needed, ctypes.c_float(-0.35))
+                        return out
                     else:
                         # Förbli 100% bergfast vid LIVE i realtid utan ljudflimmer
                         pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
@@ -701,17 +726,17 @@ class TapeEngine:
                         # Flerstegs hastighetsacceleration anpassad för stor rotor
                         rate = self._velocity_est
                         if rate > 2000:
-                            gain = 35.0
+                            gain = 30.0
                         elif rate > 1200:
-                            gain = 22.0
+                            gain = 18.0
                         elif rate > 600:
-                            gain = 12.0
+                            gain = 10.0
                         elif rate > 300:
-                            gain = 5.0
+                            gain = 4.5
                         elif rate > 150:
-                            gain = 2.5
+                            gain = 2.2
                         else:
-                            gain = 1.5
+                            gain = 1.4
 
                         # Avstånds-boost: om man är långt bakom (>10s eller >25s) spolas det ännu snabbare
                         if behind_sec > 25.0:
@@ -732,21 +757,22 @@ class TapeEngine:
                             self.speed = 1.0
                         else:
                             self.head_pos = (self.head_pos + delta_samples) % self.tape.max_frames
-                            self.speed = float(np.clip(delta_samples / frames_needed, 1.0, 6.0))
+                            # Resamplingshastighet (tonhöjd): behåll i ett musikaliskt intervall (max 2.0x, inte 6.0x squeal!)
+                            self.speed = float(np.clip(1.0 + (rate / 600.0), 1.0, 2.0))
 
                     else:
                         # BAKÅT: Responsiv vinylscratch med dynamisk hastighetsacceleration
                         rate = self._velocity_est
                         if rate > 2000:
-                            gain = 25.0
+                            gain = 22.0
                         elif rate > 1200:
-                            gain = 16.0
+                            gain = 14.0
                         elif rate > 600:
-                            gain = 8.0
+                            gain = 7.0
                         elif rate > 300:
-                            gain = 4.0
+                            gain = 3.5
                         elif rate > 150:
-                            gain = 2.0
+                            gain = 1.8
                         else:
                             gain = 1.0
 
@@ -758,7 +784,9 @@ class TapeEngine:
                             self.head_pos = (live_edge - max_history) % self.tape.max_frames
                         else:
                             self.head_pos = (self.head_pos + delta_samples) % self.tape.max_frames
-                        self.speed = float(np.clip(delta_samples / frames_needed, -6.0, 0.0))
+
+                        # Resamplingshastighet bakåt: musikalisk vinyl-tonhöjd (mellan -0.2x och -1.8x)
+                        self.speed = float(np.clip(-0.35 - (rate / 700.0), -1.8, -0.2))
 
                 elif hand_on_wheel:
                     # Handen vilar på hjulet i bandhistoriken (scratch paus)
@@ -788,7 +816,18 @@ class TapeEngine:
                         self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
 
                 pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
-                return self.tape.read_interp(pos)
+                out = self.tape.read_interp(pos)
+
+                # Anti-squeal bandhuvudsdämpning: dämpar skarpa diskantskrik när bandet spolas snabbt eller bakåt
+                if self.speed > 1.15 or self.speed < 0.0:
+                    excess = max(0.0, self.speed - 1.15) if self.speed > 0 else (abs(self.speed) * 0.45)
+                    f_damp = float(np.clip(-0.15 - 0.40 * excess, -0.65, 0.0))
+                    if _libdsp is not None:
+                        out = np.ascontiguousarray(out, dtype=np.float32)
+                        ptr = out.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+                        _libdsp.svf_filter_block(ctypes.byref(self.tape_spool_svf), ptr, frames_needed, ctypes.c_float(f_damp))
+
+                return out
 
             # --- MODE_LOOP: Instant looper med framåtriktad expansion ---
             elif self.mode == self.MODE_LOOP:
