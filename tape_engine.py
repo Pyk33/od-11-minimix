@@ -229,6 +229,7 @@ class TapeEngine:
         self.dj_trans_t1_phase = 0
         self.dj_trans_switched = False
         self.dj_trans_t2_detected_time = 0.0
+        self.dj_trans_t2_head = 0.0
         self.dj_trans_wait_start = 0.0
         self.dj_trans_wait_timeout = 6.5
         self.dj_trans_svf_t1 = _SVFState()
@@ -405,6 +406,7 @@ class TapeEngine:
             self.dj_trans_switched = False
             self.dj_trans_t2_detected_time = 0.0
             live_edge = (self.tape.write_pos - self.live_latency_frames) % self.tape.max_frames
+            self.dj_trans_t2_head = float(live_edge)
 
             if from_loop or (self.mode == self.MODE_LOOP and self.loop_active):
                 # Använd den aktiva loopen som Track 1
@@ -940,11 +942,23 @@ class TapeEngine:
             # --- MODE_DJ: Beat-Matched Smart Transition Engine ---
             elif self.mode == self.MODE_DJ:
                 if self.is_dj_transition:
-                    # Mät ljudnivå (RMS & peak) på inkommande ström vid live_edge
-                    pos_live = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
-                    chunk_live = self.tape.read_interp(pos_live)
-                    rms_live = float(np.sqrt(np.mean(chunk_live ** 2)))
-                    peak_live = float(np.max(np.abs(chunk_live)))
+                    # Spåra inkommande ström (Track 2) med en jämn, monoton läsnål och PLL mot live_edge
+                    pos_t2 = (self.dj_trans_t2_head + np.arange(frames_needed)) % self.tape.max_frames
+                    self.dj_trans_t2_head = (self.dj_trans_t2_head + frames_needed) % self.tape.max_frames
+
+                    dist_t2 = (live_edge - self.dj_trans_t2_head) % self.tape.max_frames
+                    if dist_t2 > self.tape.max_frames / 2:
+                        dist_t2 -= self.tape.max_frames
+
+                    if abs(dist_t2) > int(0.5 * self.sr):
+                        self.dj_trans_t2_head = float(live_edge)
+                    elif abs(dist_t2) > 100:
+                        nudge_t2 = np.clip(dist_t2 * 0.005, -1.5, 1.5)
+                        self.dj_trans_t2_head = (self.dj_trans_t2_head + nudge_t2) % self.tape.max_frames
+
+                    audio_t2_raw = self.tape.read_interp(pos_t2)
+                    rms_live = float(np.sqrt(np.mean(audio_t2_raw ** 2)))
+                    peak_live = float(np.max(np.abs(audio_t2_raw)))
                     now = time.monotonic()
 
                     # FAS 1: VÄNTA PÅ ATT NÄSTA LÅT BYTS, SÖKS TILL ~18S OCH FAKTISKT HAR STABIL LJUD/ENERGI
@@ -985,7 +999,7 @@ class TapeEngine:
                             ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
                             _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f_wait))
 
-                        self.head_pos = live_edge
+                        self.head_pos = self.dj_trans_t2_head
                         self.dj_trans_progress = 0.0
                         return audio_t1
 
@@ -1022,7 +1036,7 @@ class TapeEngine:
                             ptr1 = audio_t1.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
                             _libdsp.svf_filter_block(ctypes.byref(self.dj_trans_svf_t1), ptr1, frames_needed, ctypes.c_float(f_wait))
 
-                        self.head_pos = live_edge
+                        self.head_pos = self.dj_trans_t2_head
                         self.dj_trans_progress = 0.0
                         return audio_t1
 
@@ -1036,12 +1050,12 @@ class TapeEngine:
                         if F <= 0.0:
                             f1_start = min(F, -0.20) if abs(F) <= 0.05 else F
                             f1 = float(np.clip(f1_start - (0.85 + f1_start) * p, -1.0, 1.0))
-                            t2_entry = 0.65
+                            t2_entry = 0.22
                             f2 = float(np.clip(t2_entry * (1.0 - p) + F * p, -1.0, 1.0))
                         else:
                             f1_start = F
                             f1 = float(np.clip(f1_start + (0.90 - f1_start) * p, -1.0, 1.0))
-                            t2_entry = -0.50
+                            t2_entry = -0.22
                             f2 = float(np.clip(t2_entry * (1.0 - p) + F * p, -1.0, 1.0))
 
                         # 1. Track 1: Rytmkärna tonas ut med svepande filter & rymdsvans
@@ -1079,10 +1093,8 @@ class TapeEngine:
 
                         out_t1 = audio_t1 * g1 + echo_out * (0.60 * (1.0 - p))
 
-                        # 2. Track 2: Inkommande låt vid live_edge + filter mot användarens position F
-                        pos_t2 = (live_edge - frames_needed + np.arange(frames_needed)) % self.tape.max_frames
-                        audio_t2 = self.tape.read_interp(pos_t2)
-
+                        # 2. Track 2: Inkommande låt via monoton dj_trans_t2_head + filter mot position F
+                        audio_t2 = audio_t2_raw.copy()
                         g2 = float(np.sin(p * np.pi * 0.5))
 
                         if _libdsp is not None and abs(f2) >= 0.005:
@@ -1092,17 +1104,17 @@ class TapeEngine:
 
                         out_t2 = audio_t2 * g2
 
-                        # 3. Summering: konstant total akustisk energi
-                        out = out_t1 + out_t2
+                        # 3. Summering: konstant total akustisk energi med mjuk mättnad
+                        out = np.clip(out_t1 + out_t2, -1.0, 1.0)
 
-                        self.head_pos = live_edge
+                        self.head_pos = self.dj_trans_t2_head
                         self.dj_trans_pos += frames_needed
                         if self.dj_trans_pos >= self.dj_trans_frames:
                             # Övergången är klar! Lås sömlöst till Track 2 med användarens filter intakt
                             self.is_dj_transition = False
                             self.dj_trans_state = "IDLE"
                             self.is_live = True
-                            self.head_pos = live_edge
+                            self.head_pos = self.dj_trans_t2_head
                             self.speed = 1.0
                             # Kopiera SVF-tillstånd för klickfri handover till normal uppspelning
                             if hasattr(self, "dj_svf_state") and hasattr(self, "dj_trans_svf_t2"):
