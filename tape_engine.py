@@ -430,10 +430,10 @@ class TapeEngine:
             self.dj_trans_svf_t2 = _SVFState()
             # Överför filtertillstånd från dj_svf_state så Track 1 behåller sitt filter sömlöst utan klick
             if hasattr(self, "dj_svf_state"):
-                self.dj_trans_svf_t1.ic1eq_l = self.dj_svf_state.ic1eq_l
-                self.dj_trans_svf_t1.ic2eq_l = self.dj_svf_state.ic2eq_l
-                self.dj_trans_svf_t1.ic1eq_r = self.dj_svf_state.ic1eq_r
-                self.dj_trans_svf_t1.ic2eq_r = self.dj_svf_state.ic2eq_r
+                self.dj_trans_svf_t1.ic1eq[0] = self.dj_svf_state.ic1eq[0]
+                self.dj_trans_svf_t1.ic1eq[1] = self.dj_svf_state.ic1eq[1]
+                self.dj_trans_svf_t1.ic2eq[0] = self.dj_svf_state.ic2eq[0]
+                self.dj_trans_svf_t1.ic2eq[1] = self.dj_svf_state.ic2eq[1]
             if _libdsp is not None and hasattr(_libdsp, "echo_init"):
                 _libdsp.echo_init(ctypes.byref(self.dj_trans_echo_state), self.sr)
             self._py_echo_buf.fill(0.0)
@@ -1091,10 +1091,10 @@ class TapeEngine:
                             self.speed = 1.0
                             # Kopiera SVF-tillstånd för klickfri handover till normal uppspelning
                             if hasattr(self, "dj_svf_state") and hasattr(self, "dj_trans_svf_t2"):
-                                self.dj_svf_state.ic1eq_l = self.dj_trans_svf_t2.ic1eq_l
-                                self.dj_svf_state.ic2eq_l = self.dj_trans_svf_t2.ic2eq_l
-                                self.dj_svf_state.ic1eq_r = self.dj_trans_svf_t2.ic1eq_r
-                                self.dj_svf_state.ic2eq_r = self.dj_trans_svf_t2.ic2eq_r
+                                self.dj_svf_state.ic1eq[0] = self.dj_trans_svf_t2.ic1eq[0]
+                                self.dj_svf_state.ic1eq[1] = self.dj_trans_svf_t2.ic1eq[1]
+                                self.dj_svf_state.ic2eq[0] = self.dj_trans_svf_t2.ic2eq[0]
+                                self.dj_svf_state.ic2eq[1] = self.dj_trans_svf_t2.ic2eq[1]
 
                         return out
 
