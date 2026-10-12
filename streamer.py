@@ -842,7 +842,7 @@ def render_dj_view(d, s, t):
     h_box = by1 - by0
 
     if is_trans:
-        # Dual-track morph: T1 (Natural Beat-Loop med LPF filter sweep) och T2 (HPF svep in)
+        # Dual-track morph: T1 (LPF svep + rymdsvans) och T2 (HPF svep in till rent)
         cutoff_t1 = max(0.05, 1.0 - trans_p * 0.85)
         gain_t1 = math.cos(trans_p * math.pi * 0.5)
         cutoff_t2 = max(0.05, (1.0 - trans_p) * 0.70)
@@ -852,9 +852,9 @@ def render_dj_view(d, s, t):
         for px in range(bx0 + 1, bx1):
             rel_x = (px - bx0) / float(w_box)
 
-            # T1 LPF response (heldragen linje som pulserar i låtens takt)
+            # T1 LPF response (heldragen linje som sveper neråt)
             if rel_x < cutoff_t1:
-                r1 = (0.75 + 0.08 * math.sin(rel_x * 8.0 + t * (bpm / 15.0))) * gain_t1
+                r1 = (0.75 + 0.06 * math.sin(rel_x * 8.0 + t * 5.0)) * gain_t1
             else:
                 r1 = 0.75 * math.exp(-6.0 * (rel_x - cutoff_t1)) * gain_t1
             py1 = int(by1 - 2 - r1 * (h_box - 4))
@@ -874,8 +874,8 @@ def render_dj_view(d, s, t):
                 d.line([pts2[i], pts2[i+1]], fill=255, width=1)
 
         # 3. Crossfade-mätare (y=45..60)
-        d.text((4, 45), "LOOP", font=F_XS, fill=255)
-        d.text((bx1 - text_w(d, "LIVE", F_XS), 45), "LIVE", font=F_XS, fill=255)
+        d.text((4, 45), "OUT", font=F_XS, fill=255)
+        d.text((bx1 - text_w(d, "IN", F_XS), 45), "IN", font=F_XS, fill=255)
 
         tl_y = 57
         d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)

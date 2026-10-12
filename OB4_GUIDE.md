@@ -95,7 +95,7 @@ Ett kraftfullt och festanpassat DJ-verktyg utformat för att bygga upp stämning
   - Nederst: Bi-polär filtermätare med mittpunkt vid neutralt (`CLEAN`).
 - **Höger kommandokolumn (sidebar):**
   - `◎ FILTER`: Bi-polärt DJ-filter (vrid vänster för LPF / vrid höger för HPF).
-  - `▲ XFADE`: Kort tryck på övre knappen aktiverar **Natural Beat-Loop Smart Transition**! Maskinen analyserar bufferten blixtsnabbt (1,4 ms), detekterar låtens naturliga BPM och fångar en perfekt taktsynkad 1-bar loop låst till baskaggen. Medan detta naturliga groove loopar, sveps LPF neråt (sång/diskant tas bort och lämnar ett pulserande bakgrundsgroove), nästa låt tonas in med HPF ovanpå och tar sömlöst över!
+  - `▲ XFADE`: Kort tryck på övre knappen aktiverar **Seamless DJ Smart Crossfade**! Nuvarande låt fortsätter framåt från exakt aktuell punkt utan att hoppa bakåt eller repetera text, medan LPF sveper neråt och en stereo rymdsvans (Space Echo) lämnar ett mjukt efterklangsgroove. Nästa låt från Spotify tonas in med HPF ovanpå och tar sömlöst över!
   - `↳ BRAKE`: Håll övre knappen för **Turntable Brake / Tape Stop** (musiken saktar in och stannar som en vinylspelare vars motor stängts av!).
   - `▼ TAPE`: Kort tryck på nedre knappen växlar till `TAPE`.
   - `↳ VOL`: Håll nedre knappen för att återgå till standard volymläge.
@@ -104,7 +104,7 @@ Ett kraftfullt och festanpassat DJ-verktyg utformat för att bygga upp stämning
 |---|---|---|
 | **Rotary Encoder (Vrid vänster)** | Vrid | **Low-Pass Filter (LPF):** Skär bort diskant och sång. Ljudet blir djupt och mörkt som om du står i toalettkön utanför klubben! |
 | **Rotary Encoder (Vrid höger)** | Vrid | **High-Pass Filter (HPF):** Skär bort bas och kick för att bygga upp maximal förväntan! |
-| **Övre knapp (`IO22`)** | Klick | **NATURAL BEAT-LOOP (XFADE):** Intelligent DJ-övergång! Hittar låtens naturliga BPM och fångar en taktsynkad 1-takts loop som svänger i låtens egen rytm. Filtret sveper ner medan nästa låt från Spotify tonas in ovanpå. Noll glitchiga klipp, 100 % musikaliskt! Klicka igen för att avbryta/snäppa till nutid. |
+| **Övre knapp (`IO22`)** | Klick | **SMART CROSSFADE (XFADE):** Silkeslen DJ-övergång! Spelar framåt från exakt aktuell punkt (0 ms hopp/repetition), sveper LPF neråt med mjuk rymdsvans medan nästa låt tonas in med HPF. Noll glitchiga klipp, 100 % musikaliskt! Klicka igen för att avbryta/snäppa till nutid. |
 | | Håll (>0.5 s) | **TURNTABLE BRAKE (Tape Stop):** Skivspelarens motor stängs av och musiken saktar in till ett stopp (*wwwhhhoooom*). Släpp för att varva upp igen! |
 | **Nedre knapp (`IO23`)** | Klick | Växla vidare till **`TAPE` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode**. |
