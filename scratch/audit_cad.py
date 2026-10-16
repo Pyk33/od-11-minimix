@@ -61,7 +61,10 @@ for i, (hx, hy) in enumerate(CAD.PI_HOLES):
           ll.is_inside(V(x, y, CAD.LID_THICK - 0.5)))
 ex, ey = CAD.c(CAD.ENC_X, CAD.ENC_Y)
 check("encoder: kragehål öppet", not ll.is_inside(V(ex, ey, 1.0)))
-check("encoder: försänkning öppen i topp, solid under", not ll.is_inside(V(ex + 14.0, ey, CAD.LID_THICK - 0.3)))
+check("encoder: rattbrunn öppen upptill", not ll.is_inside(V(ex + 16.0, ey, 3.5)))
+check("encoder: brunnens bottenfläns solid mellan hål", ll.is_inside(V(ex + 16.5, ey, 1.5)))
+check("encoder: M3 försänkningskon i brunnens botten öppen", not ll.is_inside(V(ex + 14.0, ey, 1.5)))
+check("encoder: monteringsficka under locket öppen", not ll.is_inside(V(ex + 16.0, ey, 0.1)))
 
 print("== Kollisionsmatris (komponenter mot låda och varandra, mm³) ==")
 parts = {"BOTTEN": base, "LOCK": lid}

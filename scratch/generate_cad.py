@@ -101,11 +101,15 @@ OLED_TAPE_GAP = 0.3                           # plats för svart skumtejp/packni
 BEZEL_RECESS = 0.4                            # nedsänkt fönsterram
 BEZEL_RECESS_MARGIN = 1.2
 
-# Encoder
-ENC_X, ENC_Y = 138.5, 40.0                    # bakom Cubilux USB-delen (användarens beskrivning)
-ENC_PCD = 14.0                                # radie (PCD 28)
+# Encoder & Nedsänkt Rattbrunn (M3x6 försänkta skruvar, ratten infälld i locket)
+ENC_X, ENC_Y = 138.5, 40.0                    # bakom Cubilux USB-delen
+ENC_PCD = 14.0                                # radie (PCD 28 mm)
 ENC_ALPHA = 35.14
-KNOB_GROOVE_R0, KNOB_GROOVE_R1, KNOB_GROOVE_DEPTH = 18.4, 19.6, 0.8   # skuggspalt runt rattens bas
+KNOB_R = 17.5                                 # ratt radie (35 mm diam)
+KNOB_H = 16.0                                 # ratt höjd
+KNOB_WELL_R = 18.3                            # brunn radie (36.6 mm diam, 0.8 mm jämn spalt runt ratten)
+KNOB_WELL_DEPTH = 2.6                         # brunnens djup från lockets ovansida (ratten nedsänkt 2.1 mm)
+ENC_MOUNT_T = 2.0                             # plasttjocklek under skruvhuvud (ger 4.0 mm rent gängingrepp för M3x6)
 
 # Gravyr
 ENGRAVE_TEXT = "OLLE's MiniMix"
@@ -368,24 +372,30 @@ def build_lid():
             with Locations((bx, by, 0)):
                 Cylinder(6.1, 20, mode=Mode.SUBTRACT)
 
-        # encoder
+        # encoder & nedsänkt rattbrunn (M3x6 försänkta skruvar)
         ex, ey = c(ENC_X, ENC_Y)
+        well_bottom_z = LID_THICK - KNOB_WELL_DEPTH            # 2.4 mm i locket
+        enc_face_z = well_bottom_z - ENC_MOUNT_T              # 0.4 mm i locket (2.0 mm fästfläns)
+        # 1. Nedsänkt brunn för ratten från lockets ovansida
+        with Locations((ex, ey, LID_THICK - KNOB_WELL_DEPTH / 2)):
+            Cylinder(KNOB_WELL_R, KNOB_WELL_DEPTH + 0.01, mode=Mode.SUBTRACT)
+        # 2. Ficka under locket upp till fästytan
+        with Locations((ex, ey, enc_face_z / 2)):
+            Cylinder(19.8, enc_face_z + 0.01, mode=Mode.SUBTRACT)
+        # 3. Centrumhål för encoderns 20 mm krage
         with Locations((ex, ey, 0)):
             Cylinder(10.3, 20, mode=Mode.SUBTRACT)
-            for p in (0.0, 120.0, 240.0):
-                for ang in (p, p + ENC_ALPHA):
-                    sx = ENC_PCD * math.cos(math.radians(ang))
-                    sy = ENC_PCD * math.sin(math.radians(ang))
-                    with Locations((sx, sy, 0)):
-                        Cylinder(1.65, 20, mode=Mode.SUBTRACT)
-                    with Locations((sx, sy, LID_THICK - 0.825)):
-                        Cone(bottom_radius=1.65, top_radius=3.3, height=1.65, mode=Mode.SUBTRACT)
-        # skuggspalt (nedsänkt ring) runt rattens bas
-        with BuildSketch(Plane.XY.offset(LID_THICK - KNOB_GROOVE_DEPTH)):
-            with Locations((ex, ey)):
-                Circle(KNOB_GROOVE_R1)
-                Circle(KNOB_GROOVE_R0, mode=Mode.SUBTRACT)
-        extrude(amount=KNOB_GROOVE_DEPTH + 0.1, mode=Mode.SUBTRACT)
+        # 4. 6 st M3-hål med 90° försänkning från brunnens botten (optimerade för M3x6)
+        cone_h = 1.65                                         # DIN 7991 M3 försänkt huvud
+        cone_zc = well_bottom_z - cone_h / 2                  # 1.575 mm i locket
+        for p in (0.0, 120.0, 240.0):
+            for ang in (p, p + ENC_ALPHA):
+                sx = ex + ENC_PCD * math.cos(math.radians(ang))
+                sy = ey + ENC_PCD * math.sin(math.radians(ang))
+                with Locations((sx, sy, 0)):
+                    Cylinder(1.65, 20, mode=Mode.SUBTRACT)
+                with Locations((sx, sy, cone_zc)):
+                    Cone(bottom_radius=1.65, top_radius=3.3, height=cone_h, mode=Mode.SUBTRACT)
 
         # gravyr (nedsänkt, samma färg). Vänd 180° => läsbar från användarsidan (bakre kanten)
         tx_, ty_ = c(*ENGRAVE_POS)
@@ -437,12 +447,15 @@ def build_ghosts():
         g[f"Knapp{i+1}_kropp"] = Pos(*c(BTN_X, by), lid_z + LID_THICK - 19.0 / 2 + 1.5) * Cylinder(5.9, 19.0 + 3.0)
         g[f"Knapp{i+1}_mutter"] = Pos(*c(BTN_X, by), lid_z - 1.5) * Cylinder(8.1, 3.0)
         g[f"Knapp{i+1}_huvud"] = Pos(*c(BTN_X, by), lid_z + LID_THICK + 1.0) * Cylinder(7.25, 2.0)
-    # Encoder
+    # Encoder & Ratt (nedsänkt i locket, M3x6 skruvar i brunnens botten)
     ex, ey = c(ENC_X, ENC_Y)
-    g["Encoder_kropp"] = Pos(ex, ey, lid_z - 34.0 / 2) * Cylinder(19.25, 34.0)
-    g["Encoder_krage"] = Pos(ex, ey, lid_z + 2.5) * Cylinder(10.0, 5.0)
-    g["Encoder_axel"] = Pos(ex, ey, lid_z + 5 + 8) * Cylinder(3.0, 16.0)
-    g["Ratt"] = Pos(ex, ey, lid_z + 5 + 1.0 + 8) * Cylinder(17.5, 16.0)
+    enc_face = lid_z + (LID_THICK - KNOB_WELL_DEPTH - ENC_MOUNT_T)   # monteringsyta = lid_z + 0.4
+    g["Encoder_kropp"] = Pos(ex, ey, enc_face - 34.0 / 2) * Cylinder(19.25, 34.0)
+    g["Encoder_krage"] = Pos(ex, ey, enc_face + 2.5) * Cylinder(10.0, 5.0)
+    g["Encoder_axel"] = Pos(ex, ey, enc_face + 5.0 + 8.0) * Cylinder(3.0, 16.0)
+    # Ratten sänks ner 2.1 mm under lockets ovansida (0.5 mm frigång till brunnens botten)
+    knob_bottom = lid_z + (LID_THICK - KNOB_WELL_DEPTH) + 0.5        # lid_z + 2.9
+    g["Ratt"] = Pos(ex, ey, knob_bottom + KNOB_H / 2) * Cylinder(KNOB_R, KNOB_H)
     # OLED-modul
     glass_top, pcb_top = oled_levels()
     g["OLED_PCB"] = Pos(pcb_gx, pcb_cy, lid_z + pcb_top - OLED_PCB_T / 2) * Box(PCB_W, PCB_H, OLED_PCB_T)
