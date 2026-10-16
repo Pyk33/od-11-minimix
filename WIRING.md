@@ -38,8 +38,8 @@ flowchart LR
     G17 --- ENC
     G27 --- ENC
     GND --> ENC
-    G22 --- B1
-    G23 --- B2
+    G23 --- B1
+    G22 --- B2
     GND --> B1
     GND --> B2
     USB --> DAC
@@ -94,16 +94,16 @@ Använd bara stiften märkta **NO** och **C**. Låt **NC** vara okopplad.
 
 | Knapp | C (Common) | NO (Normally Open) | HAT-plintar (Rad 3) |
 |---|---|---|---|
-| **Play/Pause** | GND | GPIO22 | **`GND`** + **`IO22`** |
-| **Next** | GND | GPIO23 | **`GND`** + **`IO23`** |
+| **Play/Pause** (övre) | GND | GPIO23 | **`GND`** + **`IO23`** |
+| **Next** (nedre) | GND | GPIO22 | **`GND`** + **`IO22`** |
 
 Inga externa motstånd behövs. Koden aktiverar interna pull-ups automatiskt.
 
 ### Knappfunktioner i koden:
-- **Play/Pause (IO22):** 
+- **Play/Pause (IO23, övre knapp):** 
   - Klick: Växla Play / Pause.
   - Håll intryckt (0,7 s): Mute / Unmute.
-- **Next (IO23):** 
+- **Next (IO22, nedre knapp):** 
   - Klick: Nästa låt.
   - Håll intryckt (0,7 s): Föregående låt.
 - **Säker avstängning:** Håll **båda knapparna samtidigt i 3 sekunder**. Skärmen visar *"STÄNGER AV..."* och Pi:n stängs ner kontrollerat.
@@ -134,8 +134,8 @@ Officiella 15,3 W USB-C-adaptern till Pi:n. Encoder och skärm drar bara Pi:ns e
 | 11 | GPIO17 | Encoder A | Grön |
 | 13 | GPIO27 | Encoder B | Vit |
 | 14 | GND | Encoder GND | Svart |
-| 15 | GPIO22 | Knapp Play/Pause | |
-| 16 | GPIO23 | Knapp Next | |
+| 15 | GPIO22 | Knapp Next (nedre) | |
+| 16 | GPIO23 | Knapp Play/Pause (övre) | |
 | 20 | GND | Knappar COM | |
 
 ## Tips för 3D-printad låda

@@ -48,8 +48,8 @@ except Exception as _e:
 # --------------------------------------------------------------------------- #
 ENC_PIN_A = 17
 ENC_PIN_B = 27
-BTN_PLAY_PAUSE = 22
-BTN_NEXT = 23
+BTN_PLAY_PAUSE = 23   # övre knappen (längst från användaren)
+BTN_NEXT = 22         # nedre knappen (närmast användaren)
 
 API = os.environ.get("LIBRESPOT_API", "http://127.0.0.1:3678")
 MIXER_CONTROL = "Master"          # softvol-kontroll skapad av /etc/asound.conf
@@ -1201,8 +1201,10 @@ def shutdown(*_):
 def main():
     global encoder
     driver = ssd1306 if os.environ.get("OLED_DRIVER", "sh1106").lower() == "ssd1306" else sh1106
+    # Lådan används med sladdväggen bortvänd => skärmbilden vänds 180° i mjukvara.
+    oled_rotate = int(os.environ.get("OLED_ROTATE", "2"))
     try:
-        device = driver(i2c(port=1, address=0x3C))
+        device = driver(i2c(port=1, address=0x3C), rotate=oled_rotate)
         device.contrast(200)
     except Exception as exc:
         print(f"OLED saknas ({exc}) - k\u00f6r utan sk\u00e4rm", flush=True)

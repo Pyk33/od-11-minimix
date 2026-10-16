@@ -57,10 +57,10 @@
 
   <!-- Buttons -->
   <rect x="700" y="585" width="200" height="50" rx="8" fill="#eef9ee" stroke="#111" stroke-width="2"/>
-  <text x="800" y="606" text-anchor="middle" font-size="14" font-weight="bold">Knapp Play/Pause</text>
+  <text x="800" y="606" text-anchor="middle" font-size="14" font-weight="bold">Knapp Next (nedre)</text>
   <text x="710" y="623" font-size="12">NO</text><text x="890" y="623" text-anchor="end" font-size="12">COM</text>
   <rect x="700" y="640" width="200" height="50" rx="8" fill="#eef9ee" stroke="#111" stroke-width="2"/>
-  <text x="800" y="661" text-anchor="middle" font-size="14" font-weight="bold">Knapp Next</text>
+  <text x="800" y="661" text-anchor="middle" font-size="14" font-weight="bold">Knapp Play/Pause (övre)</text>
   <text x="710" y="678" font-size="12">NO</text><text x="890" y="678" text-anchor="end" font-size="12">COM</text>
 
   <line x1="300" y1="610" x2="560" y2="610" stroke="#7b2fbf" stroke-width="3"/>

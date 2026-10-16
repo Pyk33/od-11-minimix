@@ -36,9 +36,9 @@ Normal uppspelning från Spotify Connect eller AirPlay.
 | Kontroll | Symbol | Åtgärd | Funktion |
 |---|---|---|---|
 | **Rotary Encoder** | `[◎]` | Vrid | Höj / sänk volym (0–85 %). Stor TE-volymoverlay. |
-| **Övre knapp (`IO22`)** | `[■|□]` | Klick | Play / Pause. |
+| **Övre knapp (`IO23`)** | `[■|□]` | Klick | Play / Pause. |
 | | `[■|□]_` | Håll (>0.5 s) | Mute / Unmute (eller LIVE vid eftersläpning). |
-| **Nedre knapp (`IO23`)** | `[□|■]` | Klick | Nästa låt (Spotify / AirPlay). |
+| **Nedre knapp (`IO22`)** | `[□|■]` | Klick | Nästa låt (Spotify / AirPlay). |
 | | `[□|■]_` | Håll (>0.5 s) | **Gå in i OB-4 `TAPE` Mode!** |
 
 ---
@@ -53,9 +53,9 @@ En kontinuerlig 15-minuters bandbuffert spelar in all musik i realtid i 48 kHz s
 |---|---|---|
 | **Rotary Encoder** | Vrid moturs | **Scratcha bakåt i musikhistorien!** (1:1 autentisk vinylkänsla). |
 | | Vrid medurs | **Super Spool framåt mot LIVE:** Snabb vridning accelererar spolningen exponentiellt (upp till 30x) så du sveper 30–60 sekunder på nolltid. Spärras och fastnar bergfast vid LIVE (t-0). |
-| **Övre knapp (`IO22`)** | Klick | **1-KLICK DJ MERGE TO LIVE!** Om du ligger bakom nutid görs en mjuk equal-power DJ-crossfade som stilrent mixar bandet in i realtidsströmmen! Vid LIVE: Vanlig **Play / Pause** (pausar musiken och visar `PAUSED`). |
+| **Övre knapp (`IO23`)** | Klick | **1-KLICK DJ MERGE TO LIVE!** Om du ligger bakom nutid görs en mjuk equal-power DJ-crossfade som stilrent mixar bandet in i realtidsströmmen! Vid LIVE: Vanlig **Play / Pause** (pausar musiken och visar `PAUSED`). |
 | | Håll (>0.5 s) | **Direkt snitt till LIVE:** Omedelbart klipp fram till realtidsströmmen utan fade. |
-| **Nedre knapp (`IO23`)** | Klick | Växla till **`LOOP` Mode**. |
+| **Nedre knapp (`IO22`)** | Klick | Växla till **`LOOP` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Låten fortsätter spela sömlöst framåt från exakt den punkt nålen befinner sig på! |
 
 ---
@@ -77,11 +77,11 @@ Fångar omedelbart en slinga av musiken och upprepar den med klickfria equal-pow
 
 | Kontroll | Åtgärd | Funktion |
 |---|---|---|
-| **Övre knapp (`IO22`)** | Klick | **Växla rattläge mellan `SIZE` och `MOVE` (`SWAP`)!** |
+| **Övre knapp (`IO23`)** | Klick | **Växla rattläge mellan `SIZE` och `MOVE` (`SWAP`)!** |
 | | Håll (>0.5 s) | **Reverse Loop:** Spela loopen baklänges (`REV`)! |
 | **Rotary Encoder (i `SIZE`)** | Vrid | **Öka / minska looptid:** När du ökar längden läggs den nya tiden till **framåt i låten** så att kommande takter kommer in i loopen! Stegar mellan 0.125 s upp till 16.0 s. |
 | **Rotary Encoder (i `MOVE`)** | Vrid | **Flytta loopen längs tidslinjen:** Skjuter hela loopfönstret framåt eller bakåt genom musiken så du kan hitta det perfekta partiet att loopa. |
-| **Nedre knapp (`IO23`)** | Klick | Växla till **`DJ` Mode**. |
+| **Nedre knapp (`IO22`)** | Klick | Växla till **`DJ` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode:** Musiken fortsätter spela sömlöst framåt från loopens position in i resten av låten! |
 
 ---
@@ -104,9 +104,9 @@ Ett kraftfullt och festanpassat DJ-verktyg utformat för att bygga upp stämning
 |---|---|---|
 | **Rotary Encoder (Vrid vänster)** | Vrid | **Low-Pass Filter (LPF):** Skär bort diskant och sång. Ljudet blir djupt och mörkt som om du står i toalettkön utanför klubben! |
 | **Rotary Encoder (Vrid höger)** | Vrid | **High-Pass Filter (HPF):** Skär bort bas och kick för att bygga upp maximal förväntan! |
-| **Övre knapp (`IO22`)** | Klick | **BEAT-MATCHED TRANSITION (XFADE):** Intelligent DJ-övergång! Håller förra låtens groove vid 100 % volym tills nästa låt faktiskt levererar ljud. Matchar taktslag och energinivå, droppar in på takten och sveper med filter. Noll tystnad, noll volymdipp, 100 % musikaliskt! Klicka igen för att avbryta/snäppa till nutid. |
+| **Övre knapp (`IO23`)** | Klick | **BEAT-MATCHED TRANSITION (XFADE):** Intelligent DJ-övergång! Håller förra låtens groove vid 100 % volym tills nästa låt faktiskt levererar ljud. Matchar taktslag och energinivå, droppar in på takten och sveper med filter. Noll tystnad, noll volymdipp, 100 % musikaliskt! Klicka igen för att avbryta/snäppa till nutid. |
 | | Håll (>0.5 s) | **TURNTABLE BRAKE (Tape Stop):** Skivspelarens motor stängs av och musiken saktar in till ett stopp (*wwwhhhoooom*). Släpp för att varva upp igen! |
-| **Nedre knapp (`IO23`)** | Klick | Växla vidare till **`TAPE` Mode**. |
+| **Nedre knapp (`IO22`)** | Klick | Växla vidare till **`TAPE` Mode**. |
 | | Håll (>0.5 s) | **Återgå till `VOL` Mode**. |
 
 ---
