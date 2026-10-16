@@ -26,6 +26,15 @@ check("USB-C: hålets underkant under pluggen", not base.is_inside(V(ux, CAD.FRO
 check("USB-C: golvet under hålet intakt", base.is_inside(V(ux, CAD.FRONT_Y + 1.2, CAD.Z(CAD.USBC_Z - 6.0))))
 check("TOSLINK-hörn rundat (hörnpunkt är solid)", base.is_inside(V(tx + 8.25, CAD.FRONT_Y + 1.2, CAD.Z(0.1) + 0.05)))
 
+print("== Ventilation (ska sitta på sladdväggen, användarsidan solid) ==")
+vx0, _ = CAD.c(46, 0)
+vx9, _ = CAD.c(46 + 9 * 6.0, 0)
+for nm, vx in (("första", vx0), ("sista", vx9)):
+    check(f"vent {nm}: öppen i sladdväggen", not base.is_inside(V(vx, CAD.FRONT_Y + 1.2, CAD.Z(30))))
+    check(f"vent {nm}: användarsidans vägg solid", base.is_inside(V(vx, CAD.REAR_Y - 1.2, CAD.Z(30))))
+check("vent: solid vägg mellan två springor", base.is_inside(V((vx0 + CAD.c(52, 0)[0]) / 2, CAD.FRONT_Y + 1.2, CAD.Z(30))))
+check("vent: USB-C-hålets sida är fri från springor (x-avstånd >= 3 mm)", vx0 - 1.2 - (ux + (CAD.USBC_PLUG_W + 0.7) / 2) >= 3.0)
+
 print("== Cubilux-vagga ==")
 cx_, _ = CAD.c(CAD.CR_X, 0)
 check("vagga: block-utrymme fritt", not base.is_inside(V(cx_, CAD.c(0, 10)[1], CAD.Z(8))))

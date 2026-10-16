@@ -135,10 +135,12 @@ def build_base():
             x, y = c(PI_X + 22 + i * 7.0, PI_Y + 28)
             with Locations((x, y, 0)):
                 Box(2.5, 28, 8, mode=Mode.SUBTRACT)
-        # Ventilation högt i bakväggen (varmluft ut)
-        for i in range(11):
-            x, _ = c(40 + i * 6.0, 0)
-            with Locations((x, REAR_Y, Z(30))):
+        # Ventilation högt i sladdväggen (varmluft ut). Lådan används med sladdväggen
+        # bortvänd från användaren => ventilation och sladdar hamnar på samma sida.
+        # Placeras till höger om USB-C-hålet så de aldrig skär portarna.
+        for i in range(10):
+            x, _ = c(46 + i * 6.0, 0)
+            with Locations((x, FRONT_Y, Z(30))):
                 Box(2.4, WALL * 3, 12, mode=Mode.SUBTRACT)
 
         # ---------------- Cubilux-vagga ("egen liten låda") ----------------

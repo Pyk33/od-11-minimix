@@ -91,7 +91,7 @@ bh = CAD.BASE_H
 # ---------------- Bild 1: planer ----------------
 fig, axs = plt.subplots(2, 2, figsize=(21, 11.5), facecolor="#111111")
 panel(axs[0, 0], 2, fz + 8, "1  Plan, 8 mm över golvet: Cubilux-vagga (rails, stoppvägg), standoffs, USB-C-hål", low)
-panel(axs[0, 1], 2, fz + 30, "2  Plan, 30 mm över golvet: HAT-plintar, rotor, bakväggens ventilationsspringor",
+panel(axs[0, 1], 2, fz + 30, "2  Plan, 30 mm över golvet: HAT-plintar, rotor, ventilationsspringor i sladdväggen",
       ["Botten"] + [n for n in ghosts if n.startswith(("Distans", "HAT", "Encoder_kropp", "Knapp", "OLED_pinhus"))])
 panel(axs[1, 0], 2, bh - 0.6, "3  Lockets undersida (0.6 mm under lockets underkant): styrring, stödhylsor, OLED-ram, knappmuttrar",
       ["Lock"] + [n for n in ghosts if n.startswith(("Knapp", "OLED", "Encoder_kropp"))])
