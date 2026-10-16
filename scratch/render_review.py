@@ -83,20 +83,20 @@ def panel(ax, axis, d, title, names, xlim=None, ylim=None):
 
 
 ALL = list(MESH)
-LID_MOUNTED = ("Knapp", "Ratt", "Encoder", "OLED", "Mutter")
+LID_MOUNTED = ("Knapp", "Ratt", "Encoder", "OLED")
 low = ["Botten"] + [n for n in ghosts if not n.startswith(LID_MOUNTED[:3] + ("OLED",))]
 fz = CAD.FLOOR_THICK
 bh = CAD.BASE_H
 
 # ---------------- Bild 1: planer ----------------
 fig, axs = plt.subplots(2, 2, figsize=(21, 11.5), facecolor="#111111")
-panel(axs[0, 0], 2, fz + 8, "1  Plan, 8 mm över golvet: Cubilux-vagga (rails, stoppvägg), standoffs, USB-C-hål", low)
-panel(axs[0, 1], 2, fz + 30, "2  Plan, 30 mm över golvet: HAT-plintar, rotor, ventilationsspringor i sladdväggen",
+panel(axs[0, 0], 2, fz + 8, "1  Plan, 8 mm över golvet: Cubilux-vagga (retention, kabelspår), standoffs, USB-C-hål", low)
+panel(axs[0, 1], 2, fz + 30, "2  Plan, 30 mm över golvet: HAT-plintar, rotor, långa smala ventilationsslitsar i sladdväggen",
       ["Botten"] + [n for n in ghosts if n.startswith(("Distans", "HAT", "Encoder_kropp", "Knapp", "OLED_pinhus"))])
-panel(axs[1, 0], 2, bh - 0.6, "3  Lockets undersida (0.6 mm under lockets underkant): styrring, stödhylsor, OLED-ram, knappmuttrar",
+panel(axs[1, 0], 2, bh - 0.6, "3  Lockets undersida (0.6 mm under lockets underkant): snäpptungor, styrring, stödhylsor, OLED-ram",
       ["Lock"] + [n for n in ghosts if n.startswith(("Knapp", "OLED", "Encoder_kropp"))])
-panel(axs[1, 1], 2, bh + 1.0, "4  Lock, snitt 1.0 mm in i locket: skärmens glasficka + fönster, mutterfickor, knapp-/rotorhål",
-      ["Lock"] + [n for n in ghosts if n.startswith(("Knapp", "OLED", "Encoder", "Mutter", "Pinne"))])
+panel(axs[1, 1], 2, bh + 1.0, "4  Lock, snitt 1.0 mm in i locket: skärmens glasficka + fönster, blinda distansfickor, gravyr",
+      ["Lock"] + [n for n in ghosts if n.startswith(("Knapp", "OLED", "Encoder", "Pinne"))])
 plt.tight_layout()
 p1 = os.path.join(OUT, "review_plans.png")
 plt.savefig(p1, dpi=100, facecolor="#111111")
@@ -108,7 +108,7 @@ cx_, _ = CAD.c(CAD.CR_X, 0)
 ex, ey = CAD.c(CAD.ENC_X, CAD.ENC_Y)
 ux, _ = CAD.c(CAD.USBC_X, 0)
 fig, axs = plt.subplots(2, 2, figsize=(21, 11.5), facecolor="#111111")
-panel(axs[0, 0], 1, gy, "5  Snitt genom skärmens mitt (framifrån): bezel 1.0 mm, glas, PCB, plintar under (1.5 mm luft)", ALL)
+panel(axs[0, 0], 1, gy, "5  Snitt genom skärmens mitt (framifrån): nedsänkt bezel, glasficka, PCB, 2.8 mm luft till plintar", ALL)
 panel(axs[0, 1], 0, cx_, "6  Snitt genom Cubilux-vaggan (från sidan): block, snäpplist, stoppvägg + kabelspår, knapp ovanför",
       ["Botten", "Lock"] + [n for n in ghosts if n.startswith(("Cubilux", "Knapp", "Pi_PCB"))])
 panel(axs[1, 0], 0, ex, "7  Snitt genom rotorn (från sidan): kropp, krage genom locket, ratt, golvfrigång under kroppen", ALL)

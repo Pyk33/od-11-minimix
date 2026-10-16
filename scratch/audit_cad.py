@@ -27,13 +27,13 @@ check("USB-C: golvet under hålet intakt", base.is_inside(V(ux, CAD.FRONT_Y + 1.
 check("TOSLINK-hörn rundat (hörnpunkt är solid)", base.is_inside(V(tx + 8.25, CAD.FRONT_Y + 1.2, CAD.Z(0.1) + 0.05)))
 
 print("== Ventilation (ska sitta på sladdväggen, användarsidan solid) ==")
-vx0, _ = CAD.c(46, 0)
-vx9, _ = CAD.c(46 + 9 * 6.0, 0)
-for nm, vx in (("första", vx0), ("sista", vx9)):
-    check(f"vent {nm}: öppen i sladdväggen", not base.is_inside(V(vx, CAD.FRONT_Y + 1.2, CAD.Z(30))))
-    check(f"vent {nm}: användarsidans vägg solid", base.is_inside(V(vx, CAD.REAR_Y - 1.2, CAD.Z(30))))
-check("vent: solid vägg mellan två springor", base.is_inside(V((vx0 + CAD.c(52, 0)[0]) / 2, CAD.FRONT_Y + 1.2, CAD.Z(30))))
-check("vent: USB-C-hålets sida är fri från springor (x-avstånd >= 3 mm)", vx0 - 1.2 - (ux + (CAD.USBC_PLUG_W + 0.7) / 2) >= 3.0)
+vx0, _ = CAD.c(CAD.VENT_X0, 0)
+vx_last, _ = CAD.c(CAD.VENT_X0 + (CAD.VENT_N - 1) * CAD.VENT_PITCH, 0)
+for nm, vx in (("första", vx0), ("sista", vx_last)):
+    check(f"vent {nm}: öppen i sladdväggen", not base.is_inside(V(vx, CAD.FRONT_Y + 1.2, CAD.Z(CAD.VENT_ZC))))
+    check(f"vent {nm}: användarsidans vägg solid", base.is_inside(V(vx, CAD.REAR_Y - 1.2, CAD.Z(CAD.VENT_ZC))))
+check("vent: solid vägg mellan två springor", base.is_inside(V((vx0 + CAD.c(CAD.VENT_X0 + CAD.VENT_PITCH, 0)[0]) / 2, CAD.FRONT_Y + 1.2, CAD.Z(CAD.VENT_ZC))))
+check("vent: USB-C-hålets sida är fri från springor (x-avstånd >= 3 mm)", vx0 - 1.0 - (ux + (CAD.USBC_PLUG_W + 0.7) / 2) >= 3.0)
 
 print("== Cubilux-vagga ==")
 cx_, _ = CAD.c(CAD.CR_X, 0)
@@ -43,21 +43,22 @@ check("vagga: stoppvägg solid bredvid spåret", base.is_inside(V(cx_ + 6.0, CAD
 check("vagga: kabelspår öppet i botten", not base.is_inside(V(cx_, CAD.c(0, CAD.BLOCK_FRONT_Y + CAD.BLOCK_L + 1.1)[1], CAD.Z(3.0))))
 check("vagga: kabelspår öppet hela vägen till toppen (drop-in)", not base.is_inside(V(cx_, CAD.c(0, CAD.BLOCK_FRONT_Y + CAD.BLOCK_L + 1.1)[1], CAD.Z(15.0))))
 
-print("== Lock ==")
+print("== Lock (Skruvlöst med snäpp + slät ovansida) ==")
 ll = lid.moved(Location((0, 0, -CAD.BASE_H)))
 check("undersidan i mitten är ÖPPEN (ingen solid platta)", not ll.is_inside(V(0, 0, -0.7)))
 check("styrringen finns vid kanten", ll.is_inside(V(CAD.INT_X / 2 + 0.6, 0, -0.7)))
 gx, gy = CAD.c(CAD.OG_X, CAD.OG_Y)
 pcy = gy - CAD.GLASS_OFFSET_Y
-check("OLED: fönster öppet rakt igenom", not ll.is_inside(V(gx, gy, 3.0)) and not ll.is_inside(V(gx, gy, 1.0)))
-check("OLED: glasficka öppen nära glasets hörn", not ll.is_inside(V(gx + 17.0, gy + 9.0, 1.5)))
-check("OLED: ramen runt fönstret är solid (bezel)", ll.is_inside(V(gx + 16.5, gy, 3.0)))
-check("OLED: PCB-ficka nåbar underifrån", not ll.is_inside(V(gx + 17.5, pcy - 14.0, 0.3)) and not ll.is_inside(V(gx + 17.5, pcy - 14.0, -0.5)))
+check("OLED: fönster öppet rakt igenom", not ll.is_inside(V(gx, gy, 4.0)) and not ll.is_inside(V(gx, gy, 1.0)))
+check("OLED: glasficka öppen nära glasets hörn", not ll.is_inside(V(gx + 16.5, gy + 8.5, 2.0)))
+check("OLED: ramen runt fönstret är solid (bezel)", ll.is_inside(V(gx + 16.0, gy, 4.1)))
+check("OLED: PCB-ficka nåbar underifrån", not ll.is_inside(V(gx + 17.5, pcy - 14.0, 0.5)) and not ll.is_inside(V(gx + 17.5, pcy - 14.0, -0.5)))
 for i, (hx, hy) in enumerate(CAD.PI_HOLES):
     x, y = CAD.c(hx, hy)
-    check(f"distanshål {i+1}: pinnhål öppet + mutterficka öppen + stödhylsa solid",
-          (not ll.is_inside(V(x, y, 1.0))) and (not ll.is_inside(V(x, y, CAD.LID_THICK - 1.0)))
-          and ll.is_inside(V(x + 2.4, y, -1.0)))
+    check(f"distans {i+1}: blind ficka öppen underifrån + stödhylsa solid",
+          (not ll.is_inside(V(x, y, 0.5))) and ll.is_inside(V(x + 2.4, y, -1.0)))
+    check(f"distans {i+1}: lockets ovansida HELT SLÄT & SOLID (skruvlöst, inga hål)",
+          ll.is_inside(V(x, y, CAD.LID_THICK - 0.5)))
 ex, ey = CAD.c(CAD.ENC_X, CAD.ENC_Y)
 check("encoder: kragehål öppet", not ll.is_inside(V(ex, ey, 1.0)))
 check("encoder: försänkning öppen i topp, solid under", not ll.is_inside(V(ex + 14.0, ey, CAD.LID_THICK - 0.3)))
