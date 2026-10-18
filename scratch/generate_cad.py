@@ -127,23 +127,26 @@ FEET = [(14.0, 14.0), (INT_X - 14.0, 14.0), (14.0, INT_Y - 14.0), (INT_X - 14.0,
 # Snäpptungor (skruvlöst lock). (vägg, läge längs väggen i inre koordinater)
 HOOKS = [("front", 50.0), ("front", 135.0), ("rear", 60.0), ("rear", 125.0),
          ("left", 41.0), ("right", 12.0), ("right", 64.0)]
-HOOK_W = 8.0                                   # bredd 8.0 mm (var 6.0 mm, +33% fästyta)
+HOOK_W = 6.0                                   # 6.0 mm bredd (exakt samma som förut => passar befintlig utskriven botten!)
 # Profil i (v, z): v = mm inåt från väggens insida, z = mm relativt lockets undersida (nedåt negativt)
-# Förstärkt rot: 2.6 mm mot locket (var 1.4 mm) med avsmalnande kil (taper) ner till 1.6 mm flexbalk
+# Förstärkningen sker 100% INÅT i lådan (där det är fri luft) så bottenlådan inte behöver printas om:
+# - Roten: 2.6 mm tjock (var 1.4 mm) med avsmalnande kil mot locket (3.3x högre böjmotstånd)
+# - Balken: 1.6 mm tjock (var 1.2 mm => 4 solida 0.4 mm perimetrar utan ihålighet)
+# - Snäppläpp: 0.55 mm grepp (var 0.4 mm), passar perfekt i befintliga bottenlådans 0.8 mm spår
 HOOK_PROFILE = [
     (0.0, 0.0),
-    (2.6, 0.0),       # förstärkt rot med integrerad kil (4.6x högre böjmotstånd mot locket)
+    (2.6, 0.0),       # förstärkt rot med integrerad kil (mot lockets insida)
     (1.8, -3.5),      # mjuk avsmalnande profil (taper) för jämn spänningsfördelning
-    (1.8, -10.0),     # solid 1.6 mm flexbalk (var 1.2 mm, 4 solida 0.4 mm perimetrar)
+    (1.8, -10.0),     # solid 1.6 mm flexbalk (var 1.2 mm)
     (0.4, -10.0),     # fasad spets för enkel införing
-    (-0.6, -9.0),     # ledande ramp vid montering
-    (-0.6, -8.5),     # distinkt snäppläpp med 0.6 mm grepp i väggspåret (var 0.4 mm)
+    (-0.55, -9.0),    # ledande ramp vid montering
+    (-0.55, -8.5),    # snäppläpp 0.55 mm (passar perfekt i befintliga bottenlådans 0.8 mm spår)
     (0.2, -7.6),      # robust snäppklack för distinkt mekaniskt klick
     (0.2, -1.0),      # 0.2 mm frigång mot väggens insida
     (0.0, -1.0)       # övergång till lockets undersida
 ]
-# Spår i väggen (matchat för 0.6 mm läpp med 0.3 mm bottenpel)
-GROOVE_PROFILE = [(0.0, -10.5), (-0.9, -9.4), (-0.9, -8.2), (0.0, -7.2)]
+# Spår i väggen (100% orört från tidigare, identiskt med den redan utskrivna bottenlådan)
+GROOVE_PROFILE = [(0.0, -10.4), (-0.8, -9.4), (-0.8, -8.3), (0.0, -7.3)]
 
 
 def c(ix, iy):
