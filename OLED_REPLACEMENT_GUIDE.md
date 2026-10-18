@@ -42,10 +42,16 @@ CAD-skriptet `scratch/generate_cad.py` genererar locket med följande parametrar
 3. **Flatkabel-avlastning:** Dedikerad urfräsning i plasten vid glasets nederkant ($15.0 \times 9.0\text{ mm}$) så att flatkabeln aldrig kan komma i kontakt med lockets plast.
 4. **Gravyr:** `"OLLE's MiniMix"` centrerad direkt under fönstret vid `(60.0, 12.0)` med knivskarp $5.2\text{ mm}$ typografi.
 5. **Audit-resultat:** `scratch/audit_cad.py` godkänd med **0 kollisioner** mot Pi 4, distanser, GeeekPi HAT-plintar, encoder och M12-knappar.
+6. **Förstärkta snäpptungor (Rev 5):**
+   - Roten förstärkt från $1.4\text{ mm}$ till **$2.6\text{ mm}$** med avsmalnande kil (*taper*) inåt i lådan.
+   - Balken förtjockad till **$1.6\text{ mm}$** (4 solida perimetrar vid $0.4\text{ mm}$ munstycke).
+   - Läppen fördjupad till **$0.55\text{ mm}$** för distinkt mekaniskt klick i det befintliga $0.8\text{ mm}$ spåret.
+   - **100% kompatibel med befintlig utskriven bottenlåda:** All förstärkning är lagd inåt mot det fria luftrummet inuti lådan, så bottenlådan behöver **inte** printas om.
 
 ### Filer för 3D-utskrift:
-- **Lock STL:** [`cad_output/od11_minimix_lid.stl`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_lid.stl)
+- **Lock STL:** [`cad_output/od11_minimix_lid.stl`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_lid.stl) *(det enda du behöver printa om!)*
 - **Lock STEP:** [`cad_output/od11_minimix_lid.step`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_lid.step)
+- **Botten STL (orörd):** [`cad_output/od11_minimix_base.stl`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_base.stl)
 - **Komplett montering:** [`cad_output/od11_minimix_assembly.step`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_assembly.step)
 
 ---
