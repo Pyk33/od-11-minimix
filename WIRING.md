@@ -12,7 +12,7 @@
 ```mermaid
 flowchart LR
     subgraph PI["Raspberry Pi 4 + GeeekPi HAT"]
-        P1["3V3 (pin 1)"]
+        P4["5V (pin 4 / plint)"]
         P2["5V (pin 2)"]
         SDA["GPIO2 SDA (pin 3)"]
         SCL["GPIO3 SCL (pin 5)"]
@@ -23,14 +23,14 @@ flowchart LR
         GND["GND (pin 6, 9, 14, 20)"]
         USB["USB-A"]
     end
-    OLED["OLED 1.3 tum I2C"]
+    OLED["OLED 1.5 tum SH1107 (128x128)"]
     ENC["LPD3806 encoder"]
     B1["Knapp Play/Pause"]
     B2["Knapp Next"]
     DAC["Cubilux USB till TOSLINK"]
     OD["OD-11 (TOSLINK, undersidan)"]
 
-    P1 --> OLED
+    P4 --> OLED
     SDA --> OLED
     SCL --> OLED
     GND --> OLED
@@ -46,17 +46,20 @@ flowchart LR
     DAC -->|"TOSLINK-kabel"| OD
 ```
 
-## 1. OLED-skärm (1.3" I2C, adress 0x3C)
+## 1. OLED-skärm (1.5" SH1107 I2C kvadratisk 128x128, adress 0x3C)
 
-| Skärm | Din kabelfärg | Pi / GeeekPi HAT | Fysisk Pin |
+> [!IMPORTANT]
+> **Hailege-modulens VCC MÅSTE kopplas till +5V!**  
+> 1.5"-modulen har en inbyggd 3.3V LDO-regulator (662K) och en skyddsdiod. Om den matas med 3.3V får styrchippet bara ~2.7V, vilket gör att skärmen inte tänds. Anslut till **5V (pin 4 eller 5V-plint)**.
+>
+> **Stiftordning på modulens kretskort (från vänster till höger):** `GND` • `VCC` • `SCL` • `SDA`
+
+| Skärm (Stift på modul) | Din kabelfärg | Pi / GeeekPi HAT | Fysisk Pin |
 |---|---|---|---|
-| **VCC** | **Orange** | **3V3** *(OBS: 3.3V, inte 5V)* | Pin 1 |
-| **GND** | **Gul** | **GND** | Pin 9 (eller valfri GND) |
-| **SDA** | **Ljusbrun** | **GPIO2** (SDA) | Pin 3 |
-| **SCL** | **Röd** | **GPIO3** (SCL) | Pin 5 |
-
-> [!WARNING]
-> Använd **3,3 V** (pin 1), inte 5 V.
+| **GND** (Stift 1) | **Gul / Svart** | **GND** | Pin 9 (eller valfri GND) |
+| **VCC** (Stift 2) | **Orange / Röd** | **5V** *(OBS: 5V, inte 3.3V!)* | Pin 4 (eller 5V-plint) |
+| **SCL** (Stift 3) | **Röd / Gul** | **GPIO3** (SCL) | Pin 5 |
+| **SDA** (Stift 4) | **Ljusbrun / Blå** | **GPIO2** (SDA) | Pin 3 |
 
 Kontroll efter uppstart: `sudo i2cdetect -y 1` ska visa `3c`.
 
