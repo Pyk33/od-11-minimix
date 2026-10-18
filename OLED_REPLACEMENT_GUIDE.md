@@ -1,83 +1,102 @@
-# Guide: Uppgradering till 1.5" Kvadratisk OLED (128x128) & Nytt Lock (Rev 5)
+# Guide & Dokumentation: Uppgradering till 1.5" Kvadratisk OLED (128x128 SH1107)
 
-Dokumentation för installation av **1.5 tum SH1107 (128x128 I2C)**, måttchecklista och CAD/mjukvaruplan.
+Dokumentation för installation av **Hailege 1.5" SH1107 OLED (128x128 I2C)**, mekanisk CAD-lösning för locket, inkoppling och mjukvarukonfiguration i `streamer.py`.
 
 ---
 
 ## 1. Vad som hände med förra skärmen (Rotorsak)
 
-- **CAD-mått i Rev 4:** Glasfickan var $18.6\text{ mm}$ hög (bara det aktiva bildområdet).
-- **Verkligt mått:** Glassubstratet fortsatte ner till $23\text{ mm}$ plus flatkabelns böj ($25\text{–}26\text{ mm}$).
-- **Resultat:** Plastkanten klämde mot glasets svagaste punkt och knäckte glasskivan vid COG-bondningen.
+- **CAD-mått i Rev 4:** Glasfickan var $18.6\text{ mm}$ djup/hög (endast beräknad efter den aktiva bildytan).
+- **Verkligt mått på 1.3"-modulen:** Glassubstratet fortsatte ner till $23.0\text{ mm}$ plus flatkabelns böj runt kanten ($25\text{–}26\text{ mm}$).
+- **Resultat:** Plastkanten klämde direkt mot glasets svagaste punkt och knäckte glasskivan vid COG-bondningen vid montering.
 
 ---
 
-## 2. Vald ny skärm: Hailege 1.5" SH1107 OLED (128x128)
+## 2. Vald ny skärm & Officiell Ritning (MC01506)
 
-- **Modell:** Hailege 1,5" SSH1107 OLED 128x128 Vit
-- **Gränssnitt:** 4-pin IIC / I2C (`SDA, SCL, GND, VCC`)
-- **Styrkrets:** **SH1107** (stöds direkt i Python via `luma.oled.device.sh1107`)
-- **Upplösning:** 128 x 128 pixlar (Kvadratisk!)
-- **Fysisk form:** Kvadratiskt kretskort (ca $42\text{–}45\text{ mm}$ per sida) och kvadratisk bildyta (~$27 \times 27\text{ mm}$).
-- **Flexkabelns placering:** Sitter på **sidokanten** (inte underkanten som på 1.3").
-- **Orientering:** Modulen kan roteras i locket så att sladdarna ansluts optimalt, och bilden roteras i mjukvaran (`rotate=0, 1, 2, 3`) så att den alltid visas rättvänd.
+Skärmen är **Hailege 1.5" SH1107 OLED 128x128 Vit (IIC/I2C)** (Amazon ASIN `B0CJY2Q4SY`).
+Tillverkarens tekniska ritning (LCDWiki SKU `MC01506` / `GME128128-01`):
 
----
-
-## 3. Måttchecklista (när 1.5"-skärmen anländer)
-
-Mät följande med skjutmått och klistra in i chatten:
-
-| # | Mått att ta | Ditt mått (mm) | Kommentar |
+| Komponent / Del | Mått från ritning | CAD-ficka i locket (Rev 5) | Tolerans / Spel |
 |---|---|---|---|
-| **A** | **Kretskortets totala bredd** (PCB X) | _______ mm | Ca 42–45 mm |
-| **B** | **Kretskortets totala höjd** (PCB Y) | _______ mm | Ca 42–45 mm |
-| **C** | **Glasets totala bredd** | _______ mm | Ca 34–35 mm |
-| **D** | **Glasets totala höjd** | _______ mm | Ca 34–35 mm |
-| **E** | **Synliga/aktiva displayrutans mått** | ____ $\times$ ____ mm | Ca 27 × 27 mm |
-| **F** | **Displayrutans offset från kretskortskanterna** | X: ___ , Y: ___ mm | Hur centrerad skärmen sitter på PCB:t |
-| **G** | **Flexkabelns utstick** | _______ mm | Hur långt ut flatkabeln buktar på sidan |
-| **H** | **Total tjocklek** (Kretskort + glas) | _______ mm | Ca 3.5–4.2 mm |
-| **I** | **Pinnarnas placering & riktning** | Raka / Vinklade | Var stiften sitter och hur långt de sticker ut |
+| **Kretskort (PCB)** | $34.00 \times 47.00 \times 1.2\text{ mm}$ | $34.80 \times 47.80 \times 2.8\text{ mm}$ | $+0.8\text{ mm}$ spel i X och Y |
+| **Glasskiva** | $33.90 \times 37.30 \times 1.44\text{ mm}$ | $34.70 \times 38.50 \times 4.0\text{ mm}$ | $+0.8\text{ mm}$ i bredd, $+1.2\text{ mm}$ i höjd |
+| **Aktiv bildyta (A.A.)** | $26.855 \times 26.855\text{ mm}$ ($128 \times 128$ px) | $27.20 \times 27.20\text{ mm}$ | $+0.34\text{ mm}$ synligt fönster |
+| **Offset A.A. mot PCB** | Centrerad i X, $+2.82\text{ mm}$ mot överkant | $Y_{\text{fönster}} = Y_{\text{pcb}} + 2.82\text{ mm}$ | Exakt linjerat med bildytan |
+| **Flatkabel (nederkant)** | $10.31\text{ mm}$ urfräsning på PCB | **$15.0 \times 9.0\text{ mm}$ fri ficka** | **Helt fri luft, 0% tryck** |
+| **Stiftlist (överkant)** | 4-pin $2.54\text{ mm}$ delning | **$15.0 \times 6.0\text{ mm}$ fri ficka** | Gott om plats för lödpunkter |
+
+Ritningsfiler sparade i projektet:
+- `scratch/mc01506_size.png`
+- `scratch/mc01506_pdf.png`
 
 ---
 
-## 4. Vad vi ändrar i CAD (`scratch/generate_cad.py`)
+## 3. CAD-lösning & Geometrisk Audit
 
-1. **Kvadratiskt fönster (bezel) i locket:**
-   - Det nedsänkta fönstret görs kvadratiskt (~$28 \times 28\text{ mm}$ med snygg fasning) exakt anpassat för 128x128-bildytan.
-2. **Förstorad ficka på undersidan:**
-   - Fickan expanderas för det större kretskortet (~$45 \times 45\text{ mm}$) med generöst spel runt om.
-3. **Generös flexkabel-slits:**
-   - Djup urfasning längs den sida där flatkabeln viker runt glaset, så att kabeln har minst 1.5–2 mm fri luft och noll mekanisk belastning.
-4. **Stift-frigång:**
-   - Urtag/spår för jumperkablarna så de inte tar i lockets styrring eller HAT:ens distanser.
+CAD-skriptet `scratch/generate_cad.py` genererar locket med följande parametrar:
+1. **Placering:** `OG_X = 60.0`, `OG_Y = 35.0` (inre koordinater).
+   - Centrerat perfekt mellan Raspberry Pi-distanserna ($X=31.0$ och $X=89.0$).
+   - Ger exakt **$12.0\text{ mm}$ symmetrisk frigång** på både vänster och höger sida.
+2. **Kvadratiskt fönster:** $27.2 \times 27.2\text{ mm}$ med $2.0\text{ mm}$ hörnradie och $0.4\text{ mm}$ nedsänkt bezel-ram.
+3. **Flatkabel-avlastning:** Dedikerad urfräsning i plasten vid glasets nederkant ($15.0 \times 9.0\text{ mm}$) så att flatkabeln aldrig kan komma i kontakt med lockets plast.
+4. **Gravyr:** `"OLLE's MiniMix"` centrerad direkt under fönstret vid `(60.0, 12.0)` med knivskarp $5.2\text{ mm}$ typografi.
+5. **Audit-resultat:** `scratch/audit_cad.py` godkänd med **0 kollisioner** mot Pi 4, distanser, GeeekPi HAT-plintar, encoder och M12-knappar.
 
----
-
-## 5. Mjukvara & UI (`streamer.py`)
-
-1. **Drivrutin:**
-   ```python
-   from luma.oled.device import sh1107
-   device = sh1107(i2c(port=1, address=0x3C), width=128, height=128, rotate=oled_rotate)
-   ```
-2. **Kvadratisk layout (128x128):**
-   - Vi anpassar UI-designen för den kvadratiska rutan:
-     - **Överdel:** Statusikon, källa (Spotify/AirPlay/Tape) och låt-/artisttext.
-     - **Mitten:** Stor retro rullbandsanimation (OD-11 / OB-4 bandspelare) eller stor volymindikator.
-     - **Nederdel:** Speltid/progress-bar och volym/läge.
-3. **Elmatning:**
-   - Skärmens `VCC` kopplas till **`+5V`** på GeeekPi-plinten.
+### Filer för 3D-utskrift:
+- **Lock STL:** [`cad_output/od11_minimix_lid.stl`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_lid.stl)
+- **Lock STEP:** [`cad_output/od11_minimix_lid.step`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_lid.step)
+- **Komplett montering:** [`cad_output/od11_minimix_assembly.step`](file:///Users/ollepyk/Desktop/OD-11%20Minimix/streamer-project/cad_output/od11_minimix_assembly.step)
 
 ---
 
-## 6. Hur vi återupptar (Instruktion till AI-assistenten)
+## 4. Inkoppling & Elmatning (Viktigt!)
 
 > [!IMPORTANT]
-> **När användaren återupptar konversationen:**
-> Assistenten ska **aktivt be användaren om:**
-> 1. **Bilder på 1.5"-skärmen** (fram- och baksida).
-> 2. **Alla kontrollmått (A till I)** enligt tabellen i sektion 3.
-> 
-> Först när måtten och bilderna har stämts av uppdateras CAD-koden i `scratch/generate_cad.py` och UI-koden i `streamer.py`.
+> **Hailege-modulens VCC MÅSTE anslutas till +5V!**  
+> Modulen har en inbyggd 3.3V LDO-regulator (märkt 662K) och en skyddsdiod på kretskortet.  
+> Om du matar med 3.3V får SH1107-chippet bara ~2.7V, vilket gör att den interna laddningspumpen för OLED-panelen inte kan tända pixlarna.  
+> Anslut därför modulens **VCC till +5V** på GeeekPi HAT-skruvplinten.
+
+### Kopplingsschema:
+| Skärmstift | Signal | GeeekPi HAT Anslutning |
+|---|---|---|
+| **GND** | Jord | **GND** (skruvplint eller GPIO stift 6/9/14) |
+| **VCC** | Matningsspänning | **+5V** (skruvplint) |
+| **SCL** | I2C Klocka | **SCL** / GPIO 3 (skruvplint) |
+| **SDA** | I2C Data | **SDA** / GPIO 2 (skruvplint) |
+
+---
+
+## 5. Mjukvara & UI-layout i `streamer.py`
+
+Mjukvaran har uppdaterats för fullt stöd av SH1107 och $128 \times 128$ kvadratiskt UI:
+
+1. **Drivrutin:**
+   - Standard är nu `OLED_DRIVER="sh1107"` med upplösning $128 \times 128$.
+   - Bakåtkompatibel med `sh1106` ($128 \times 64$) om den gamla skärmen används.
+2. **Kvadratisk Teenage Engineering UI-layout:**
+   - **Main-vy (VOL/Uppspelning):**
+     - Topprad: Källa (`SPOTIFY`/`AIRPLAY`), status (`PLAY`/`PAUS`/`-MM:SS`).
+     - Titel & Artist: Stor text i `F_MD` och `F_SM` med mjuk horisontell marquee.
+     - Center: Animerad TE-spektrumanalysator med 10 dansande EQ-staplar!
+     - Progress: Speltid (`MM:SS`), totallängd och 16-segmenters progressbar.
+     - Footer: Volymindikator och segmenterad volymstapel.
+   - **Volym-overlay:**
+     - Stor `VOLUME`-badge och gigantiska siffror (`F_XL`, 38 px).
+     - 12-segmenters fet volymmätare och `LEVEL X/85` readout.
+   - **TAPE-vy (OB-4 rullbandspelare):**
+     - Två stora $30\text{ mm}$ rullbandshjul med roterande ekrar och rörligt band!
+     - Tidsförskjutnings-display (`DELAY -00:45`), scrub-hastighet (`SCRUB 1.0x`) och buffertmätare.
+   - **Sidobar (höger 1 cm):**
+     - Snyggt utspridda TE-ikoner och labels för alla 5 funktioner (Rotor, Topp-klick, Topp-håll, Botten-klick, Botten-håll).
+
+---
+
+## 6. Utskriftsrekommendation för locket (Prusa MK4S)
+
+- **Orientering:** Skriv ut med **utsidan (framsidan med fönstret) nedåt mot byggplattan**.
+- **Byggplatta:** Prusa Textured PEI Sheet eller Satin Sheet ger den karakteristiska, matta Teenage Engineering-texturen på ovansidan av locket och runt fönstret!
+- **Lagerhöjd:** 0.20 mm SPEED eller 0.15 mm STRUCTURAL.
+- **Infill:** 15–20% Gyroid eller Grid.
+- **Support:** Inga stöd behövs! Alla snäpptungor och blindfickor är optimerade för att skrivas utan stöd.

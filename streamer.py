@@ -20,10 +20,28 @@ import time
 import urllib.request
 from pathlib import Path
 
-import alsaaudio
-from gpiozero import Button, RotaryEncoder
-from luma.core.interface.serial import i2c
-from luma.oled.device import sh1106, ssd1306
+try:
+    import alsaaudio
+except ImportError:
+    alsaaudio = None
+
+try:
+    from gpiozero import Button, RotaryEncoder
+except ImportError:
+    Button, RotaryEncoder = None, None
+
+try:
+    from luma.core.interface.serial import i2c
+except ImportError:
+    i2c = None
+try:
+    from luma.oled.device import sh1106, ssd1306, sh1107
+except ImportError:
+    try:
+        from luma.oled.device import sh1106, ssd1306
+    except ImportError:
+        sh1106, ssd1306 = None, None
+    sh1107 = None
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 try:
@@ -65,14 +83,18 @@ SLEEP_AFTER_S = 300               # skärmen släcks efter inaktivitet (ej vid u
 OVERLAY_S = 1.6
 
 STATE_FILE = Path(__file__).with_name("state.json")
-W, H = 128, 64
-W_MAIN = 84                          # Vänster visning (0..84). Höger fält (85..127) = 1 cm kontroller-sidebar
+W = int(os.environ.get("OLED_WIDTH", "128"))
+H = int(os.environ.get("OLED_HEIGHT", "128" if os.environ.get("OLED_DRIVER", "sh1107").lower() == "sh1107" else "64"))
+W_MAIN = 82 if W == 128 else 84         # 0..82 = visningsfält. 83..127 = 1 cm TE kontroller-sidebar
 
 # --------------------------------------------------------------------------- #
 # Typsnitt (monospace, versaler = TE-känsla)
 # --------------------------------------------------------------------------- #
 FONT_CANDIDATES = [
     str(Path(__file__).with_name("fonts") / "pixel.ttf"),
+    "/System/Library/Fonts/SFNSMono.ttf",
+    "/System/Library/Fonts/Monaco.ttf",
+    "/Library/Fonts/Arial.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
 ]
@@ -676,7 +698,7 @@ def draw_tape_reel(d, cx, cy, radius, angle):
 
 def draw_control_sidebar(d, items):
     """
-    Ritar en 1 cm (~43 px) bred TE-inspirerad kommandokolumn på höger sida (x=84..127).
+    Ritar en 1 cm (~45 px) bred TE-inspirerad kommandokolumn på höger sida (x=W_MAIN..W-1).
     Visar exakt vad de 5 kontrollerna gör i aktivt läge:
       1. Rotor (ratt)
       2. Övre knapp kort (Tap)
@@ -684,9 +706,17 @@ def draw_control_sidebar(d, items):
       4. Nedre knapp kort (Tap)
       5. Nedre knapp långt (Hold)
     """
-    d.line([(W_MAIN, 0), (W_MAIN, 63)], fill=255)
-    row_y = [1, 13, 26, 39, 51]
+    d.line([(W_MAIN, 0), (W_MAIN, H - 1)], fill=255)
+    if H >= 100:
+        row_y = [8, 33, 58, 83, 108]
+    else:
+        row_y = [1, 13, 26, 39, 51]
+
+    font = F_SM if H >= 100 else F_XS
+
     for i, (glyph, label) in enumerate(items):
+        if i >= len(row_y):
+            break
         y = row_y[i]
         gx = W_MAIN + 3
         gy = y + 1
@@ -713,7 +743,7 @@ def draw_control_sidebar(d, items):
             d.line([(gx + 5, gy + 3), (gx + 7, gy + 5)], fill=255)
             d.line([(gx + 5, gy + 7), (gx + 7, gy + 5)], fill=255)
 
-        d.text((gx + 9, y), label, font=F_XS, fill=255)
+        d.text((gx + 10, y), label, font=font, fill=255)
 
 
 def render_tape_view(d, s, t):
@@ -724,61 +754,128 @@ def render_tape_view(d, s, t):
     is_playing = s.get("playing", True)
     is_cut_flash = now < s.get("cut_flash_until", 0.0)
 
-    d.rectangle([0, 0, 30, 9], fill=255)
-    d.text((2, 0), "TAPE", font=F_XS, fill=0)
+    if H >= 100:
+        d.rectangle([0, 0, 32, 12], fill=255)
+        d.text((2, 1), "TAPE", font=F_XS, fill=0)
 
-    if is_cut_flash:
-        status = "[CUT]"
-    elif is_merging:
-        merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
-        status = f"MRG {int(merge_p * 100)}%"
-    elif behind_sec < 0.08:
-        status = "LIVE"
+        if is_cut_flash:
+            status = "[CUT]"
+        elif is_merging:
+            merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+            status = f"MRG {int(merge_p * 100)}%"
+        elif behind_sec < 0.08:
+            status = "LIVE"
+        else:
+            tot_s = int(round(behind_sec))
+            status = f"-{tot_s//60:02d}:{tot_s%60:02d}"
+        d.text((W_MAIN - text_w(d, status, F_XS) - 2, 1), status, font=F_XS, fill=255)
+        d.line([(0, 14), (W_MAIN, 14)], fill=255)
+
+        if not is_playing:
+            angle_l, angle_r = 0.0, 0.0
+        else:
+            angle_l = t * speed * 4.0
+            angle_r = t * speed * 3.5
+
+        # Stora TE-rullar
+        draw_tape_reel(d, 20, 48, 15, angle_l)
+        draw_tape_reel(d, 62, 48, 15, angle_r)
+
+        d.line([(20, 33), (62, 33)], fill=255)
+        d.line([(20, 63), (62, 63)], fill=255)
+
+        d.rectangle([36, 40, 46, 56], outline=255)
+        d.line([(41, 42), (41, 54)], fill=255)
+
+        if is_merging:
+            merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+            bx0, by0, bx1, by1 = 12, 70, W_MAIN - 12, 76
+            d.rectangle([bx0, by0, bx1, by1], outline=255)
+            bar_w = int(merge_p * (bx1 - bx0 - 2))
+            if bar_w > 0:
+                d.rectangle([bx0 + 1, by0 + 1, bx0 + 1 + bar_w, by1 - 1], fill=255)
+
+        if is_cut_flash:
+            sp_str = "[CUT TO LIVE!]"
+        elif not is_playing:
+            sp_str = "PAUSED"
+        elif is_merging:
+            merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+            sp_str = f"DJ MERGE {int(merge_p * 100)}%"
+        elif behind_sec < 0.08:
+            sp_str = "LIVE"
+        elif abs(speed - 1.0) > 0.15:
+            sp_str = f"SCR {speed:+.1f}x"
+        else:
+            sp_str = "PLAYING"
+
+        d.text((2, 82), sp_str, font=F_MD, fill=255)
+        if behind_sec >= 0.08:
+            tot_s = int(round(behind_sec))
+            d.text((2, 100), f"DELAY {tot_s//60:02d}:{tot_s%60:02d}", font=F_SM, fill=255)
+            buf_frac = min(1.0, behind_sec / 60.0)
+            d.line([(2, 116), (W_MAIN - 4, 116)], fill=255)
+            cx = 2 + int(buf_frac * (W_MAIN - 8))
+            d.rectangle([cx - 2, 113, cx + 2, 119], fill=255)
+        else:
+            d.text((2, 100), "BUFFER READY", font=F_XS, fill=255)
+            d.text((2, 114), "TURN TO SCRUB", font=F_XS, fill=255)
     else:
-        tot_s = int(round(behind_sec))
-        status = f"-{tot_s//60:02d}:{tot_s%60:02d}"
-    d.text((W_MAIN - text_w(d, status, F_XS) - 2, 0), status, font=F_XS, fill=255)
-    d.line([(0, 10), (W_MAIN, 10)], fill=255)
+        d.rectangle([0, 0, 30, 9], fill=255)
+        d.text((2, 0), "TAPE", font=F_XS, fill=0)
 
-    if not is_playing:
-        angle_l, angle_r = 0.0, 0.0
-    else:
-        angle_l = t * speed * 4.0
-        angle_r = t * speed * 3.5
+        if is_cut_flash:
+            status = "[CUT]"
+        elif is_merging:
+            merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+            status = f"MRG {int(merge_p * 100)}%"
+        elif behind_sec < 0.08:
+            status = "LIVE"
+        else:
+            tot_s = int(round(behind_sec))
+            status = f"-{tot_s//60:02d}:{tot_s%60:02d}"
+        d.text((W_MAIN - text_w(d, status, F_XS) - 2, 0), status, font=F_XS, fill=255)
+        d.line([(0, 10), (W_MAIN, 10)], fill=255)
 
-    # Rullbandshjul placerade symmetriskt i 0..W_MAIN
-    draw_tape_reel(d, 22, 29, 10, angle_l)
-    draw_tape_reel(d, 62, 29, 10, angle_r)
+        if not is_playing:
+            angle_l, angle_r = 0.0, 0.0
+        else:
+            angle_l = t * speed * 4.0
+            angle_r = t * speed * 3.5
 
-    d.line([(22, 19), (62, 19)], fill=255)
-    d.line([(22, 39), (62, 39)], fill=255)
+        # Rullbandshjul placerade symmetriskt i 0..W_MAIN
+        draw_tape_reel(d, 22, 29, 10, angle_l)
+        draw_tape_reel(d, 62, 29, 10, angle_r)
 
-    d.rectangle([38, 23, 46, 35], outline=255)
-    d.line([(42, 25), (42, 33)], fill=255)
+        d.line([(22, 19), (62, 19)], fill=255)
+        d.line([(22, 39), (62, 39)], fill=255)
 
-    # Visuell Merge-progress bar under spolarna vid DJ Merge
-    if is_merging:
-        merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
-        bx0, by0, bx1, by1 = 18, 42, 66, 46
-        d.rectangle([bx0, by0, bx1, by1], outline=255)
-        bar_w = int(merge_p * (bx1 - bx0 - 2))
-        if bar_w > 0:
-            d.rectangle([bx0 + 1, by0 + 1, bx0 + 1 + bar_w, by1 - 1], fill=255)
+        d.rectangle([38, 23, 46, 35], outline=255)
+        d.line([(42, 25), (42, 33)], fill=255)
 
-    if is_cut_flash:
-        sp_str = "[CUT TO LIVE!]"
-    elif not is_playing:
-        sp_str = "PAUSED"
-    elif is_merging:
-        merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
-        sp_str = f"DJ MERGE {int(merge_p * 100)}%"
-    elif behind_sec < 0.08:
-        sp_str = "LIVE"
-    elif abs(speed - 1.0) > 0.15:
-        sp_str = f"SCR {speed:+.1f}x"
-    else:
-        sp_str = "PLAYING"
-    d.text((2, 53), sp_str, font=F_XS, fill=255)
+        # Visuell Merge-progress bar under spolarna vid DJ Merge
+        if is_merging:
+            merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+            bx0, by0, bx1, by1 = 18, 42, 66, 46
+            d.rectangle([bx0, by0, bx1, by1], outline=255)
+            bar_w = int(merge_p * (bx1 - bx0 - 2))
+            if bar_w > 0:
+                d.rectangle([bx0 + 1, by0 + 1, bx0 + 1 + bar_w, by1 - 1], fill=255)
+
+        if is_cut_flash:
+            sp_str = "[CUT TO LIVE!]"
+        elif not is_playing:
+            sp_str = "PAUSED"
+        elif is_merging:
+            merge_p = tape.get_merge_progress() if hasattr(tape, "get_merge_progress") else 0.5
+            sp_str = f"DJ MERGE {int(merge_p * 100)}%"
+        elif behind_sec < 0.08:
+            sp_str = "LIVE"
+        elif abs(speed - 1.0) > 0.15:
+            sp_str = f"SCR {speed:+.1f}x"
+        else:
+            sp_str = "PLAYING"
+        d.text((2, 53), sp_str, font=F_XS, fill=255)
 
     # 1 cm sidebar kontroller: tydlig skillnad mellan MERGE (kort tryck) och CUT (långt tryck)
     if behind_sec > 0.08:
@@ -816,25 +913,36 @@ def render_loop_view(d, s, t):
     )
 
     # Header: LOOP märke till vänster, status eller edit mode till höger
-    d.rectangle([0, 0, 22, 9], fill=255)
-    d.text((2, 0), "LOOP", font=F_XS, fill=0)
+    if H >= 100:
+        d.rectangle([0, 0, 26, 12], fill=255)
+        d.text((2, 1), "LOOP", font=F_XS, fill=0)
+    else:
+        d.rectangle([0, 0, 22, 9], fill=255)
+        d.text((2, 0), "LOOP", font=F_XS, fill=0)
 
     if not loop_active:
         tag = "[ARMED]"
     else:
         tag = "[SIZE] MOVE" if edit_mode == "SIZE" else "SIZE [MOVE]"
-    d.text((W_MAIN - text_w(d, tag, F_XS) - 2, 0), tag, font=F_XS, fill=255)
-    d.line([(0, 10), (W_MAIN, 10)], fill=255)
+    d.text((W_MAIN - text_w(d, tag, F_XS) - 2, 1 if H >= 100 else 0), tag, font=F_XS, fill=255)
+    d.line([(0, 14 if H >= 100 else 10), (W_MAIN, 14 if H >= 100 else 10)], fill=255)
 
     # 1. Zoomad loop-box
-    box_x0, box_y0, box_x1, box_y1 = 4, 14, 80, 31
+    if H >= 100:
+        box_x0, box_y0, box_x1, box_y1 = 4, 18, W_MAIN - 4, 64
+        info_y = 70
+        tl_y = 96
+    else:
+        box_x0, box_y0, box_x1, box_y1 = 4, 14, W_MAIN - 4, 31
+        info_y = 34
+        tl_y = 52
     d.rectangle([box_x0, box_y0, box_x1, box_y1], outline=255)
 
     if not loop_active:
         prompt_txt = "TURN TO LOOP"
         pt_w = text_w(d, prompt_txt, F_XS)
         pt_x = box_x0 + (box_x1 - box_x0 - pt_w) // 2
-        d.text((pt_x, box_y0 + 5), prompt_txt, font=F_XS, fill=255)
+        d.text((pt_x, box_y0 + (box_y1 - box_y0 - 8) // 2), prompt_txt, font=F_XS, fill=255)
     else:
         frac = tape.get_loop_progress() if tape else 0.0
         head_x = box_x0 + frac * (box_x1 - box_x0)
@@ -844,15 +952,14 @@ def render_loop_view(d, s, t):
         num_subdiv = int(loop_beats) if (1 < loop_beats <= 8) else 4
         for seg in range(1, num_subdiv):
             sx = box_x0 + seg * (box_x1 - box_x0) / float(num_subdiv)
-            d.line([(sx, box_y1 - 3), (sx, box_y1 - 1)], fill=255)
+            d.line([(sx, box_y1 - 4), (sx, box_y1 - 1)], fill=255)
 
     # 2. Text under loopen: Taktlängd och BPM
     info_str = f"{loop_name}  {int(round(loop_bpm))}BPM"
-    d.text((4, 34), info_str, font=F_XS, fill=255)
+    d.text((4, info_y), info_str, font=F_SM if H >= 100 else F_XS, fill=255)
 
     # 3. Låtens tidslinje (Timeline)
-    tl_x0, tl_x1 = 4, 80
-    tl_y = 52
+    tl_x0, tl_x1 = 4, W_MAIN - 4
     d.line([(tl_x0, tl_y), (tl_x1, tl_y)], fill=255)
     d.line([(tl_x0, tl_y - 2), (tl_x0, tl_y + 2)], fill=255)
     d.line([(tl_x1, tl_y - 2), (tl_x1, tl_y + 2)], fill=255)
@@ -906,6 +1013,9 @@ def render_loop_view(d, s, t):
         in_x = lx0 + int(frac * (lx1 - lx0))
         d.line([(in_x, tl_y - 3), (in_x, tl_y + 3)], fill=0)
 
+    if H >= 100:
+        d.text((4, 114), "[SWAP] EDIT" if loop_active else "OB-4 READY", font=F_XS, fill=255)
+
     loop_items = [
         ("rot", "LOOP" if not loop_active else edit_mode),
         ("top_tap", "START" if not loop_active else "SWAP"),
@@ -924,8 +1034,12 @@ def render_dj_view(d, s, t):
     bpm = getattr(tape, "dj_trans_bpm", 120.0) if tape else 120.0
 
     # 1. Header: DJ märke till vänster, BPM / filterstatus till höger
-    d.rectangle([0, 0, 18, 9], fill=255)
-    d.text((2, 0), "DJ", font=F_XS, fill=0)
+    if H >= 100:
+        d.rectangle([0, 0, 22, 12], fill=255)
+        d.text((2, 1), "DJ", font=F_XS, fill=0)
+    else:
+        d.rectangle([0, 0, 18, 9], fill=255)
+        d.text((2, 0), "DJ", font=F_XS, fill=0)
 
     trans_state = getattr(tape, "dj_trans_state", "CROSSFADING") if tape else "CROSSFADING"
 
@@ -948,11 +1062,18 @@ def render_dj_view(d, s, t):
     else:
         stat = f"HPF {int(filt_val*100)}%"
 
-    d.text((W_MAIN - text_w(d, stat, F_XS) - 2, 0), stat, font=F_XS, fill=255)
-    d.line([(0, 10), (W_MAIN, 10)], fill=255)
+    d.text((W_MAIN - text_w(d, stat, F_XS) - 2, 1 if H >= 100 else 0), stat, font=F_XS, fill=255)
+    d.line([(0, 14 if H >= 100 else 10), (W_MAIN, 14 if H >= 100 else 10)], fill=255)
 
-    # 2. Dynamisk filterkurva (y=14..42)
-    bx0, by0, bx1, by1 = 4, 14, 80, 42
+    # 2. Dynamisk filterkurva
+    if H >= 100:
+        bx0, by0, bx1, by1 = 4, 18, W_MAIN - 4, 72
+        lbl_y = 82
+        tl_y = 96
+    else:
+        bx0, by0, bx1, by1 = 4, 14, W_MAIN - 4, 42
+        lbl_y = 45
+        tl_y = 57
     d.rectangle([bx0, by0, bx1, by1], outline=255)
 
     w_box = bx1 - bx0
@@ -1003,24 +1124,21 @@ def render_dj_view(d, s, t):
             if len(pts2) > i + 1 and (i // 2) % 2 == 0:
                 d.line([pts2[i], pts2[i+1]], fill=255, width=1)
 
-        # 3. Crossfade-mätare (y=45..60)
+        # 3. Crossfade-mätare
         if trans_state == "WAIT_AUDIO":
-            d.text((4, 45), "CORE", font=F_XS, fill=255)
-            d.text((bx1 - text_w(d, "WAIT", F_XS), 45), "WAIT", font=F_XS, fill=255)
-            tl_y = 57
+            d.text((4, lbl_y), "CORE", font=F_XS, fill=255)
+            d.text((bx1 - text_w(d, "WAIT", F_XS), lbl_y), "WAIT", font=F_XS, fill=255)
             d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
             pulse_pos = int((math.sin(t * 8.0) * 0.5 + 0.5) * (bx1 - bx0 - 6))
             d.rectangle([bx0 + pulse_pos, tl_y - 2, bx0 + pulse_pos + 6, tl_y + 2], fill=255)
         elif trans_state == "ALIGN_BEAT":
-            d.text((4, 45), "CORE", font=F_XS, fill=255)
-            d.text((bx1 - text_w(d, "SYNC", F_XS), 45), "SYNC", font=F_XS, fill=255)
-            tl_y = 57
+            d.text((4, lbl_y), "CORE", font=F_XS, fill=255)
+            d.text((bx1 - text_w(d, "SYNC", F_XS), lbl_y), "SYNC", font=F_XS, fill=255)
             d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
             d.rectangle([bx0, tl_y - 2, bx1, tl_y + 2], fill=255)
         else:
-            d.text((4, 45), "OUT", font=F_XS, fill=255)
-            d.text((bx1 - text_w(d, "IN", F_XS), 45), "IN", font=F_XS, fill=255)
-            tl_y = 57
+            d.text((4, lbl_y), "OUT", font=F_XS, fill=255)
+            d.text((bx1 - text_w(d, "IN", F_XS), lbl_y), "IN", font=F_XS, fill=255)
             d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
             bar_w = int(trans_p * (bx1 - bx0))
             if bar_w > 0:
@@ -1055,11 +1173,10 @@ def render_dj_view(d, s, t):
                 for sy in range(top_y + 3, by1 - 1, 3):
                     d.point([(pts[i][0], sy)], fill=255)
 
-        # 3. Bi-polär filtermätare nederst (y=46..61)
-        d.text((4, 46), "LPF", font=F_XS, fill=255)
-        d.text((bx1 - text_w(d, "HPF", F_XS), 46), "HPF", font=F_XS, fill=255)
+        # 3. Bi-polär filtermätare nederst
+        d.text((4, lbl_y), "LPF", font=F_XS, fill=255)
+        d.text((bx1 - text_w(d, "HPF", F_XS), lbl_y), "HPF", font=F_XS, fill=255)
 
-        tl_y = 57
         d.line([(bx0, tl_y), (bx1, tl_y)], fill=255)
         center_x = (bx0 + bx1) // 2
         d.line([(center_x, tl_y - 3), (center_x, tl_y + 3)], fill=255)
@@ -1067,6 +1184,9 @@ def render_dj_view(d, s, t):
         curr_x = int(center_x + filt_val * (bx1 - center_x))
         curr_x = max(bx0, min(bx1, curr_x))
         d.rectangle([curr_x - 2, tl_y - 3, curr_x + 2, tl_y + 3], fill=255)
+
+    if H >= 100:
+        d.text((4, 114), "BRAKE ACTIVE" if is_brake else "FILTER READY", font=F_XS, fill=255)
 
     # 4. Sidobar
     dj_items = [
@@ -1106,50 +1226,117 @@ def render(t):
 
     if now < s["overlay_until"]:
         # --- Volym-overlay i vänstra visningsfältet 0..W_MAIN -----------------
-        label = "MUTE" if s["muted"] else f"{s['volume']:d}"
-        font = F_MD if s["muted"] else F_XL
-        w = text_w(d, label, font)
-        d.text(((W_MAIN - w) / 2, 2 if not s["muted"] else 14), label, font=font, fill=255)
-        d.text((2, 54), "VOL", font=F_XS, fill=255)
-        seg_bar(d, 22, 54, W_MAIN - 24, 8, 0 if s["muted"] else s["volume"] / max(1, VOL_MAX), 14)
+        if H >= 100:
+            d.rectangle([2, 4, 38, 16], fill=255)
+            d.text((4, 4), "VOLUME", font=F_XS, fill=0)
+            label = "MUTE" if s["muted"] else f"{s['volume']:d}"
+            font = F_MD if s["muted"] else F_XL
+            w = text_w(d, label, font)
+            d.text(((W_MAIN - w) / 2, 28 if not s["muted"] else 40), label, font=font, fill=255)
+            seg_bar(d, 4, 82, W_MAIN - 8, 12, 0 if s["muted"] else s["volume"] / max(1, VOL_MAX), 12)
+            lbl_str = "MUTED" if s["muted"] else f"LEVEL {s['volume']}/{VOL_MAX}"
+            d.text(((W_MAIN - text_w(d, lbl_str, F_XS)) / 2, 104), lbl_str, font=F_XS, fill=255)
+        else:
+            label = "MUTE" if s["muted"] else f"{s['volume']:d}"
+            font = F_MD if s["muted"] else F_XL
+            w = text_w(d, label, font)
+            d.text(((W_MAIN - w) / 2, 2 if not s["muted"] else 14), label, font=font, fill=255)
+            d.text((2, 54), "VOL", font=F_XS, fill=255)
+            seg_bar(d, 22, 54, W_MAIN - 24, 8, 0 if s["muted"] else s["volume"] / max(1, VOL_MAX), 14)
     else:
-        # --- Topprad --------------------------------------------------------
-        src = s["source"] or "OD-11"
-        d.text((2, 0), src, font=F_XS, fill=255)
-        behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
-        if behind_sec > 1.5:
-            tot_s = int(round(behind_sec))
-            stat = f"-{tot_s//60:02d}:{tot_s%60:02d}"
-        else:
-            stat = "PLAY" if s["playing"] and s["source"] else ("PAUS" if s["source"] else "RDY")
-        d.text((W_MAIN - 2 - text_w(d, stat, F_XS), 0), stat, font=F_XS, fill=255)
-        d.line([(0, 11), (W_MAIN, 11)], fill=255)
+        if H >= 100:
+            # --- Topprad (128x128) ---
+            src = s["source"] or "OD-11"
+            d.text((2, 2), src, font=F_SM, fill=255)
+            behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
+            if behind_sec > 1.5:
+                tot_s = int(round(behind_sec))
+                stat = f"-{tot_s//60:02d}:{tot_s%60:02d}"
+            else:
+                stat = "PLAY" if s["playing"] and s["source"] else ("PAUS" if s["source"] else "RDY")
+            d.text((W_MAIN - 2 - text_w(d, stat, F_SM), 2), stat, font=F_SM, fill=255)
+            d.line([(0, 16), (W_MAIN, 16)], fill=255)
 
-        # --- Titel/artist ---------------------------------------------------
-        if s["source"]:
-            animating |= marquee(d, (2, 16), s["title"].upper() or "-", F_SM, W_MAIN - 4, t)
-            animating |= marquee(d, (2, 31), s["artist"].upper() or "-", F_XS, W_MAIN - 4, t)
-        else:
-            d.text((2, 18), "OLLE'S", font=F_SM, fill=255)
-            d.text((2, 32), "MINIMIX", font=F_XS, fill=255)
+            # --- Titel/artist ---
+            if s["source"]:
+                animating |= marquee(d, (2, 22), s["title"].upper() or "-", F_MD, W_MAIN - 4, t)
+                animating |= marquee(d, (2, 38), s["artist"].upper() or "-", F_SM, W_MAIN - 4, t)
+            else:
+                d.text((2, 22), "OLLE'S", font=F_MD, fill=255)
+                d.text((2, 38), "MINIMIX", font=F_SM, fill=255)
 
-        # --- Progress (1 px linje i 0..W_MAIN) ------------------------------
-        if s["dur_ms"] > 0:
-            pos = s["pos_ms"] + ((now - s["stamp"]) * 1000 if s["playing"] else 0)
-            frac = max(0.0, min(1.0, pos / s["dur_ms"]))
-            d.line([(2, 46), (W_MAIN - 3, 46)], fill=255)
-            x = 2 + frac * (W_MAIN - 5)
-            d.rectangle([x - 1, 43, x + 1, 49], fill=255)
-            animating |= s["playing"]
-            mm = int(pos // 60000)
-            ss = int(pos // 1000 % 60)
-            d.text((2, 53), f"{mm}:{ss:02d}", font=F_XS, fill=255)
-        else:
-            d.line([(2, 46), (W_MAIN - 3, 46)], fill=255)
+            # --- TE-Style Spectrum / Audio Visualizer (y=54..76) ---
+            bx0, by0, bx1, by1 = 2, 54, W_MAIN - 4, 76
+            if s["playing"] and s["source"]:
+                animating = True
+                num_bars = 10
+                bw = (bx1 - bx0) / num_bars
+                for b in range(num_bars):
+                    h_val = int(abs(math.sin(t * 4.0 + b * 0.7)) * (by1 - by0 - 4)) + 3
+                    x_b = bx0 + b * bw
+                    d.rectangle([x_b + 1, by1 - h_val, x_b + bw - 2, by1], fill=255)
+            else:
+                d.line([(bx0, (by0 + by1) // 2), (bx1, (by0 + by1) // 2)], fill=255)
+
+            # --- Progress ---
+            if s["dur_ms"] > 0:
+                pos = s["pos_ms"] + ((now - s["stamp"]) * 1000 if s["playing"] else 0)
+                frac = max(0.0, min(1.0, pos / s["dur_ms"]))
+                mm = int(pos // 60000)
+                ss = int((pos // 1000) % 60)
+                dur_mm = int(s["dur_ms"] // 60000)
+                dur_ss = int((s["dur_ms"] // 1000) % 60)
+                d.text((2, 82), f"{mm}:{ss:02d}", font=F_XS, fill=255)
+                dur_str = f"{dur_mm}:{dur_ss:02d}"
+                d.text((W_MAIN - 2 - text_w(d, dur_str, F_XS), 82), dur_str, font=F_XS, fill=255)
+                seg_bar(d, 2, 94, W_MAIN - 4, 5, frac, segs=16)
+                animating |= s["playing"]
+            else:
+                seg_bar(d, 2, 94, W_MAIN - 4, 5, 0.0, segs=16)
+
+            # --- Volym-footer ---
+            d.line([(0, 106), (W_MAIN, 106)], fill=255)
             vtxt = "MUTE" if s["muted"] else f"VOL {s['volume']}"
-            d.text((2, 53), vtxt, font=F_XS, fill=255)
+            d.text((2, 112), vtxt, font=F_XS, fill=255)
+            seg_bar(d, 40, 114, W_MAIN - 42, 6, 0 if s["muted"] else s["volume"] / max(1, VOL_MAX), segs=8)
+        else:
+            # --- Topprad (128x64) ---
+            src = s["source"] or "OD-11"
+            d.text((2, 0), src, font=F_XS, fill=255)
+            behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
+            if behind_sec > 1.5:
+                tot_s = int(round(behind_sec))
+                stat = f"-{tot_s//60:02d}:{tot_s%60:02d}"
+            else:
+                stat = "PLAY" if s["playing"] and s["source"] else ("PAUS" if s["source"] else "RDY")
+            d.text((W_MAIN - 2 - text_w(d, stat, F_XS), 0), stat, font=F_XS, fill=255)
+            d.line([(0, 11), (W_MAIN, 11)], fill=255)
 
-    # --- Dedikerad 1cm sidebar på höger sida (x=84..127) för alla VOL-kontroller ---
+            # --- Titel/artist ---
+            if s["source"]:
+                animating |= marquee(d, (2, 16), s["title"].upper() or "-", F_SM, W_MAIN - 4, t)
+                animating |= marquee(d, (2, 31), s["artist"].upper() or "-", F_XS, W_MAIN - 4, t)
+            else:
+                d.text((2, 18), "OLLE'S", font=F_SM, fill=255)
+                d.text((2, 32), "MINIMIX", font=F_XS, fill=255)
+
+            # --- Progress (1 px linje i 0..W_MAIN) ---
+            if s["dur_ms"] > 0:
+                pos = s["pos_ms"] + ((now - s["stamp"]) * 1000 if s["playing"] else 0)
+                frac = max(0.0, min(1.0, pos / s["dur_ms"]))
+                d.line([(2, 46), (W_MAIN - 3, 46)], fill=255)
+                x = 2 + frac * (W_MAIN - 5)
+                d.rectangle([x - 1, 43, x + 1, 49], fill=255)
+                animating |= s["playing"]
+                mm = int(pos // 60000)
+                ss = int(pos // 1000 % 60)
+                d.text((2, 53), f"{mm}:{ss:02d}", font=F_XS, fill=255)
+            else:
+                d.line([(2, 46), (W_MAIN - 3, 46)], fill=255)
+                vtxt = "MUTE" if s["muted"] else f"VOL {s['volume']}"
+                d.text((2, 53), vtxt, font=F_XS, fill=255)
+
+    # --- Dedikerad 1cm sidebar på höger sida (x=W_MAIN..W-1) för alla VOL-kontroller ---
     is_playing = s.get("playing", True)
     behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
     top_hold_lbl = "LIVE" if behind_sec > 1.0 else "MUTE"
@@ -1199,13 +1386,33 @@ def shutdown(*_):
 
 
 def main():
-    global encoder
-    driver = ssd1306 if os.environ.get("OLED_DRIVER", "sh1106").lower() == "ssd1306" else sh1106
+    global encoder, W, H, W_MAIN
+    driver_name = os.environ.get("OLED_DRIVER", "sh1107").lower()
+    if driver_name == "sh1106":
+        driver = sh1106
+        default_h = 64
+    elif driver_name == "ssd1306":
+        driver = ssd1306
+        default_h = 64
+    else:
+        if sh1107 is not None:
+            driver = sh1107
+        else:
+            print("sh1107 ej tillgänglig i luma.oled, faller tillbaka på sh1106", flush=True)
+            driver = sh1106
+        default_h = 128
+
+    W = int(os.environ.get("OLED_WIDTH", "128"))
+    H = int(os.environ.get("OLED_HEIGHT", str(default_h)))
+    W_MAIN = 82 if W == 128 else 84
     # Lådan används med sladdväggen bortvänd => skärmbilden vänds 180° i mjukvara.
     oled_rotate = int(os.environ.get("OLED_ROTATE", "2"))
     try:
-        device = driver(i2c(port=1, address=0x3C), rotate=oled_rotate)
-        device.contrast(200)
+        if driver is not None:
+            device = driver(i2c(port=1, address=0x3C), width=W, height=H, rotate=oled_rotate)
+            device.contrast(200)
+        else:
+            raise RuntimeError("Ingen OLED-drivrutin tillgänglig")
     except Exception as exc:
         print(f"OLED saknas ({exc}) - k\u00f6r utan sk\u00e4rm", flush=True)
 

@@ -89,17 +89,19 @@ USBC_Z = PI_BOTTOM + PI_T + 1.6               # mitt på hylsan (3.2 mm hög)
 # Knappar (M12)
 BTN_X, BTN_Y1, BTN_Y2 = 11.0, 28.0, 54.0
 
-# OLED (1.3")
-OG_X, OG_Y = 60.5, 50.5                       # glasets mitt
-GLASS_W, GLASS_H = 34.4, 18.6
-WINDOW_W, WINDOW_H = 30.0, 15.4
-PCB_W, PCB_H = 36.0, 34.0                     # <- BEKRÄFTA (antagande)
-GLASS_OFFSET_Y = 3.7                          # glasmitt ovan PCB-mitt mot pinnkanten <- BEKRÄFTA
-OLED_TOTAL_T, OLED_PCB_T = 3.4, 1.2
-BEZEL_T = 1.0
-OLED_TAPE_GAP = 0.3                           # plats för svart skumtejp/packning mellan glas och bezel (ljustätt + fäster modulen)
+# OLED (1.5" 128x128 SH1107, tillverkarens ritning MC01506)
+OG_X, OG_Y = 60.0, 35.0                       # glasets och kretskortets mitt (exakt mitt mellan Pi-distanserna)
+GLASS_W, GLASS_H = 34.0, 37.3                 # glas yttermått (centrerat på PCB:t i MC01506)
+GLASS_T = 1.44                                # glastjocklek
+WINDOW_W, WINDOW_H = 27.2, 27.2               # kvadratiskt fönster för aktiv yta (26.86 x 26.86 mm)
+WINDOW_OFFSET_Y = 2.82                        # A.A. fönster är förskjutet 2.82 mm mot överkant (pinnkanten)
+PCB_W, PCB_H = 34.0, 47.0                     # kretskortets yttermått
+OLED_PCB_T = 1.2                              # kretskortets tjocklek
+OLED_TOTAL_T = GLASS_T + 0.3 + OLED_PCB_T     # 2.94 mm total tjocklek
+BEZEL_T = 1.0                                 # godstjocklek framför glaset
+OLED_TAPE_GAP = 0.3                           # plats för dubbelhäftande skumtejp
 BEZEL_RECESS = 0.4                            # nedsänkt fönsterram
-BEZEL_RECESS_MARGIN = 1.2
+BEZEL_RECESS_MARGIN = 1.5                     # ram runt fönstret
 
 # Encoder & Nedsänkt Rattbrunn (M3x6 försänkta skruvar, ratten infälld i locket)
 ENC_X, ENC_Y = 138.5, 40.0                    # bakom Cubilux USB-delen
@@ -111,10 +113,10 @@ KNOB_WELL_R = 18.3                            # brunn radie (36.6 mm diam, 0.8 m
 KNOB_WELL_DEPTH = 2.6                         # brunnens djup från lockets ovansida (ratten nedsänkt 2.1 mm)
 ENC_MOUNT_T = 2.0                             # plasttjocklek under skruvhuvud (ger 4.0 mm rent gängingrepp för M3x6)
 
-# Gravyr
+# Gravyr (placerad under 1.5"-skärmen)
 ENGRAVE_TEXT = "OLLE's MiniMix"
-ENGRAVE_POS = (PI_X + 42.5, 22.0)             # inre koordinater (mitt på texten)
-ENGRAVE_SIZE = 6.5
+ENGRAVE_POS = (60.0, 12.0)                    # inre koordinater (centrerat under skärmen)
+ENGRAVE_SIZE = 5.2                            # knivskarp typografi under fönstret
 ENGRAVE_DEPTH = 0.4
 
 # Ventilation + fötter
@@ -301,7 +303,8 @@ def build_base():
 # --------------------------------------------------------------------------- #
 def build_lid():
     pcb_gx, pcb_gy = c(OG_X, OG_Y)
-    pcb_cy = pcb_gy - GLASS_OFFSET_Y
+    pcb_cy = pcb_gy                                           # glaset är exakt centrerat på kretskortet i MC01506
+    win_gx, win_gy = pcb_gx, pcb_gy + WINDOW_OFFSET_Y         # fönstret förskjutet mot överkant (2.82 mm)
     r_out = max(1.0, REBATE_R - LIP_CLEAR)
     glass_top, pcb_top = oled_levels()
     with BuildPart() as lid:
@@ -333,11 +336,11 @@ def build_lid():
             with Locations((x, y, -BOSS_H / 2)):
                 Cylinder(3.2, BOSS_H, mode=Mode.ADD)
 
-        # OLED: lokaliseringsram under locket
+        # OLED: lokaliseringsram under locket (för 1.5" PCB)
         with BuildSketch(Plane.XY.offset(-1.0)):
             with Locations((pcb_gx, pcb_cy)):
                 RectangleRounded(PCB_W + 2.4, PCB_H + 2.4, 1.0)
-                RectangleRounded(PCB_W + 0.4, PCB_H + 0.4, 0.6, mode=Mode.SUBTRACT)
+                RectangleRounded(PCB_W + 0.8, PCB_H + 0.8, 0.6, mode=Mode.SUBTRACT)
         extrude(amount=1.0)
 
         # BLINDA fickor för de 4 hanpinnarna (inga hål genom locket)
@@ -346,23 +349,35 @@ def build_lid():
             with Locations((x, y, (STUD_POCKET_DEPTH - BOSS_H) / 2)):
                 Cylinder(STUD_POCKET_R, STUD_POCKET_DEPTH + BOSS_H, mode=Mode.SUBTRACT)
 
-        # OLED: PCB-ficka, glasficka, fönster, reliefspår för pinnarnas lödspetsar
+        # OLED: PCB-ficka (rymlig med 0.8 mm spel)
         pcb_pocket_d = pcb_top + 0.1
         with Locations((pcb_gx, pcb_cy, pcb_pocket_d / 2)):
-            Box(PCB_W + 0.4, PCB_H + 0.4, pcb_pocket_d, mode=Mode.SUBTRACT)
+            Box(PCB_W + 0.8, PCB_H + 0.8, pcb_pocket_d, mode=Mode.SUBTRACT)
+
+        # OLED: Glasficka (generös med +0.8 mm bredd och +1.2 mm höjd)
         glass_depth = LID_THICK - BEZEL_T
         with Locations((pcb_gx, pcb_gy, glass_depth / 2)):
-            Box(GLASS_W + 0.6, GLASS_H + 0.6, glass_depth, mode=Mode.SUBTRACT)
-        with Locations((pcb_gx, pcb_gy, 0)):
+            Box(GLASS_W + 0.8, GLASS_H + 1.2, glass_depth, mode=Mode.SUBTRACT)
+
+        # OLED: Titthål för 128x128 kvadratiska fönstret
+        with Locations((win_gx, win_gy, 0)):
             Box(WINDOW_W, WINDOW_H, 20, mode=Mode.SUBTRACT)
-        pcb_rear = pcb_cy + PCB_H / 2
-        relief_d = pcb_top + 1.5
-        with Locations((pcb_gx, pcb_rear - 2.4, relief_d / 2)):
-            Box(12.0, 3.2, relief_d, mode=Mode.SUBTRACT)
-        # nedsänkt fönsterram (bezel sänkt 0.4 mm)
+
+        # OLED: FLEXKABEL-AVLASTNING i nederkant (10.31 mm cutout på PCB)
+        # Urfräsning så flatkabeln hänger helt fritt i luften utan något mekaniskt tryck
+        flex_y = pcb_cy - PCB_H / 2 + 3.5
+        with Locations((pcb_gx, flex_y, glass_depth / 2)):
+            Box(15.0, 9.0, glass_depth + 0.2, mode=Mode.SUBTRACT)
+
+        # OLED: LÖDSPETS- OCH PINN-AVLASTNING i överkant
+        pin_y = pcb_cy + PCB_H / 2 - 2.0
+        with Locations((pcb_gx, pin_y, glass_depth / 2)):
+            Box(15.0, 6.0, glass_depth + 0.2, mode=Mode.SUBTRACT)
+
+        # nedsänkt fönsterram (bezel sänkt 0.4 mm runt kvadratiska fönstret)
         with BuildSketch(Plane.XY.offset(LID_THICK - BEZEL_RECESS)):
-            with Locations((pcb_gx, pcb_gy)):
-                RectangleRounded(WINDOW_W + 2 * BEZEL_RECESS_MARGIN, WINDOW_H + 2 * BEZEL_RECESS_MARGIN, 1.5)
+            with Locations((win_gx, win_gy)):
+                RectangleRounded(WINDOW_W + 2 * BEZEL_RECESS_MARGIN, WINDOW_H + 2 * BEZEL_RECESS_MARGIN, 2.0)
         extrude(amount=BEZEL_RECESS + 0.1, mode=Mode.SUBTRACT)
 
         # knappar
@@ -423,7 +438,7 @@ def icyl(x, y, z0, z1, r, rot=(0, 0, 0)):
 def build_ghosts():
     g = {}
     pcb_gx, pcb_gy = c(OG_X, OG_Y)
-    pcb_cy = pcb_gy - GLASS_OFFSET_Y
+    pcb_cy = pcb_gy                                           # centrerat på kretskortet
     lid_z = BASE_H
     g["Pi_PCB"] = ibox(PI_X, PI_X + 85, PI_Y, PI_Y + 56, PI_BOTTOM, PI_BOTTOM + PI_T)
     g["Pi_USB_Eth"] = ibox(PI_X + 68, PI_X + 85.8, PI_Y, PI_Y + 56, PI_BOTTOM + PI_T, PI_BOTTOM + PI_T + 15.6)
@@ -456,12 +471,12 @@ def build_ghosts():
     # Ratten sänks ner 2.1 mm under lockets ovansida (0.5 mm frigång till brunnens botten)
     knob_bottom = lid_z + (LID_THICK - KNOB_WELL_DEPTH) + 0.5        # lid_z + 2.9
     g["Ratt"] = Pos(ex, ey, knob_bottom + KNOB_H / 2) * Cylinder(KNOB_R, KNOB_H)
-    # OLED-modul
+    # OLED-modul (1.5" SH1107 128x128)
     glass_top, pcb_top = oled_levels()
     g["OLED_PCB"] = Pos(pcb_gx, pcb_cy, lid_z + pcb_top - OLED_PCB_T / 2) * Box(PCB_W, PCB_H, OLED_PCB_T)
     g["OLED_glas"] = Pos(pcb_gx, pcb_gy, lid_z + (pcb_top + glass_top) / 2) * Box(GLASS_W, GLASS_H, glass_top - pcb_top)
-    g["OLED_lodspets"] = Pos(pcb_gx, pcb_cy + PCB_H / 2 - 2.4, lid_z + pcb_top + 0.6) * Box(10.5, 1.2, 1.2)
-    g["OLED_pinhus"] = Pos(pcb_gx, pcb_cy + PCB_H / 2 - 2.4, lid_z + pcb_top - OLED_PCB_T - 4.0) * Box(10.5, 2.6, 8.0)
+    g["OLED_lodspets"] = Pos(pcb_gx, pcb_cy + PCB_H / 2 - 1.5, lid_z + pcb_top + 0.6) * Box(12.0, 2.0, 1.2)
+    g["OLED_pinhus"] = Pos(pcb_gx, pcb_cy + PCB_H / 2 - 1.5, lid_z + pcb_top - OLED_PCB_T - 4.0) * Box(12.0, 2.6, 8.0)
     return g
 
 

@@ -48,11 +48,12 @@ ll = lid.moved(Location((0, 0, -CAD.BASE_H)))
 check("undersidan i mitten är ÖPPEN (ingen solid platta)", not ll.is_inside(V(0, 0, -0.7)))
 check("styrringen finns vid kanten", ll.is_inside(V(CAD.INT_X / 2 + 0.6, 0, -0.7)))
 gx, gy = CAD.c(CAD.OG_X, CAD.OG_Y)
-pcy = gy - CAD.GLASS_OFFSET_Y
-check("OLED: fönster öppet rakt igenom", not ll.is_inside(V(gx, gy, 4.0)) and not ll.is_inside(V(gx, gy, 1.0)))
-check("OLED: glasficka öppen nära glasets hörn", not ll.is_inside(V(gx + 16.5, gy + 8.5, 2.0)))
-check("OLED: ramen runt fönstret är solid (bezel)", ll.is_inside(V(gx + 16.0, gy, 4.1)))
-check("OLED: PCB-ficka nåbar underifrån", not ll.is_inside(V(gx + 17.5, pcy - 14.0, 0.5)) and not ll.is_inside(V(gx + 17.5, pcy - 14.0, -0.5)))
+win_x, win_y = gx, gy + CAD.WINDOW_OFFSET_Y
+check("OLED: fönster öppet rakt igenom", not ll.is_inside(V(win_x, win_y, 4.0)) and not ll.is_inside(V(win_x, win_y, 1.0)))
+check("OLED: glasficka öppen nära glasets hörn", not ll.is_inside(V(gx + 16.0, gy + 17.0, 2.0)))
+check("OLED: ramen runt fönstret är solid (bezel)", ll.is_inside(V(win_x + 15.0, win_y, 4.1)))
+check("OLED: flexkabel-avlastning öppen underifrån", not ll.is_inside(V(gx, gy - CAD.PCB_H / 2 + 3.5, 3.0)))
+check("OLED: PCB-ficka nåbar underifrån", not ll.is_inside(V(gx + 16.5, gy - 20.0, 0.5)))
 for i, (hx, hy) in enumerate(CAD.PI_HOLES):
     x, y = CAD.c(hx, hy)
     check(f"distans {i+1}: blind ficka öppen underifrån + stödhylsa solid",
