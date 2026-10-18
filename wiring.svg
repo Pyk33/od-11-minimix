@@ -31,14 +31,14 @@
   <rect x="700" y="105" width="240" height="215" rx="10" fill="#eef5ff" stroke="#111" stroke-width="2"/>
   <text x="820" y="126" text-anchor="middle" font-size="14" font-weight="bold">OLED 1,5" (SH1107 128x128)</text>
   <g font-size="13" fill="#111">
-    <text x="715" y="145">VCC (5V)</text><text x="715" y="195">SDA (GPIO2)</text><text x="715" y="245">SCL (GPIO3)</text><text x="715" y="295">GND</text>
+    <text x="715" y="145">VCC (orange)</text><text x="715" y="195">SDA (ljusbrun)</text><text x="715" y="245">SCL (röd)</text><text x="715" y="295">GND (gul)</text>
   </g>
   <text x="820" y="313" text-anchor="middle" font-size="10.5" fill="#555">Modulstift: GND • VCC • SCL • SDA</text>
-  <line x1="300" y1="140" x2="700" y2="140" stroke="#d11a1a" stroke-width="3"/>
+  <line x1="300" y1="140" x2="700" y2="140" stroke="#ff7f0e" stroke-width="3"/>
   <line x1="300" y1="190" x2="700" y2="190" stroke="#8c564b" stroke-width="3"/>
   <line x1="300" y1="240" x2="700" y2="240" stroke="#d62728" stroke-width="3"/>
   <line x1="300" y1="290" x2="700" y2="290" stroke="#bcbd22" stroke-width="3"/>
-  <text x="500" y="133" text-anchor="middle" font-size="12" fill="#d11a1a" font-weight="bold">5 V (OBS: 5V pga modulens 3.3V LDO!)</text>
+  <text x="500" y="133" text-anchor="middle" font-size="12" fill="#ff7f0e" font-weight="bold">5 V (orange – OBS: kopplas till 5V pga modulens 3.3V LDO!)</text>
   <text x="500" y="183" text-anchor="middle" font-size="12" fill="#8c564b">SDA (ljusbrun)</text>
   <text x="500" y="233" text-anchor="middle" font-size="12" fill="#d62728">SCL (röd)</text>
   <text x="500" y="283" text-anchor="middle" font-size="12" fill="#7f7f00">GND (gul)</text>

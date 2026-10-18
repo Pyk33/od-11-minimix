@@ -56,10 +56,10 @@ flowchart LR
 
 | Skärm (Stift på modul) | Din kabelfärg | Pi / GeeekPi HAT | Fysisk Pin |
 |---|---|---|---|
-| **GND** (Stift 1) | **Gul / Svart** | **GND** | Pin 9 (eller valfri GND) |
-| **VCC** (Stift 2) | **Orange / Röd** | **5V** *(OBS: 5V, inte 3.3V!)* | Pin 4 (eller 5V-plint) |
-| **SCL** (Stift 3) | **Röd / Gul** | **GPIO3** (SCL) | Pin 5 |
-| **SDA** (Stift 4) | **Ljusbrun / Blå** | **GPIO2** (SDA) | Pin 3 |
+| **GND** (Stift 1) | **Gul** | **GND** | Pin 9 (eller valfri GND) |
+| **VCC** (Stift 2) | **Orange** | **5V** *(OBS: 5V, inte 3.3V!)* | Pin 4 (eller 5V-plint) |
+| **SCL** (Stift 3) | **Röd** | **GPIO3** (SCL) | Pin 5 |
+| **SDA** (Stift 4) | **Ljusbrun** | **GPIO2** (SDA) | Pin 3 |
 
 Kontroll efter uppstart: `sudo i2cdetect -y 1` ska visa `3c`.
 
