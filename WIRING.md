@@ -129,7 +129,7 @@ Officiella 15,3 W USB-C-adaptern till Pi:n. Encoder och skärm drar bara Pi:ns e
 
 | Pin | Funktion | Går till | Kabelfärg |
 |---|---|---|---|
-| 1 | 3V3 | OLED VCC | **Orange** |
+| 4 (eller 5V-plint) | 5V | OLED VCC | **Orange** (OBS: 5V pga modulens 3.3V LDO) |
 | 2 | 5V | Encoder VCC | Röd |
 | 3 | GPIO2 SDA | OLED SDA | **Ljusbrun** |
 | 5 | GPIO3 SCL | OLED SCL | **Röd** |
