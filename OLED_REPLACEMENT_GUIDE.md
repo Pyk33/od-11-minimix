@@ -70,9 +70,19 @@ När måtten är ifyllda uppdaterar vi CAD-modellen:
 
 ---
 
-## Hur vi återupptar:
-När du har skärmen framför dig: skriv bara måtten från checklistan i chatten, så:
-1. Uppdaterar jag `generate_cad.py`.
-2. Kör geometri- och kollisionstesterna.
-3. Exporterar den nya filen `od11_minimix_lid.stl`.
-4. Du slicar och printar det nya locket i EasyPrint på ~45 min!
+## 6. Hur vi återupptar (Instruktion till AI-assistenten)
+
+> [!IMPORTANT]
+> **När användaren återupptar konversationen:**
+> Assistenten ska **aktivt be användaren om:**
+> 1. **Bilder på den nya skärmen** (fram- och baksida med mått/referens så att komponentplacering, flexkabel och pinout syns tydligt).
+> 2. **Alla exakta kontrollmått (A till H)** enligt tabellen i sektion 3.
+> 
+> Först när måtten och bilderna har bekräftats ska CAD-koden i `scratch/generate_cad.py` uppdateras.
+
+### Arbetsgång vid återupptagning:
+1. Assistenten stämmer av måtten mot parametrarna i CAD.
+2. Uppdaterar `scratch/generate_cad.py` med generösa marginaler och flexkabel-avlastning.
+3. Kör geometri- och kollisionsgranskningen (`scratch/audit_cad.py`).
+4. Exporterar `cad_output/od11_minimix_lid.stl` och `.step`.
+5. Committar och pushar till GitHub så filen kan slicas i EasyPrint.
