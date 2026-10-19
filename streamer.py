@@ -1395,11 +1395,7 @@ def main():
         driver = ssd1306
         default_h = 64
     else:
-        if sh1107 is not None:
-            driver = sh1107
-        else:
-            print("sh1107 ej tillgänglig i luma.oled, faller tillbaka på sh1106", flush=True)
-            driver = sh1106
+        driver = "sh1107"
         default_h = 128
 
     W = int(os.environ.get("OLED_WIDTH", "128"))
@@ -1408,7 +1404,19 @@ def main():
     # Lådan används med sladdväggen bortvänd => skärmbilden vänds 180° i mjukvara.
     oled_rotate = int(os.environ.get("OLED_ROTATE", "2"))
     try:
-        if driver is not None:
+        if driver_name == "sh1107":
+            try:
+                from sh1107_driver import SH1107Device
+                device = SH1107Device(width=W, height=H, rotate=oled_rotate)
+                device.contrast(200)
+            except Exception as e:
+                print(f"SH1107Device init fel ({e}), provar luma", flush=True)
+                if sh1107 is not None:
+                    device = sh1107(i2c(port=1, address=0x3C), width=W, height=H, rotate=oled_rotate)
+                    device.contrast(200)
+                else:
+                    raise
+        elif driver is not None:
             device = driver(i2c(port=1, address=0x3C), width=W, height=H, rotate=oled_rotate)
             device.contrast(200)
         else:

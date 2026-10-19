@@ -49,17 +49,15 @@ flowchart LR
 ## 1. OLED-skärm (1.5" SH1107 I2C kvadratisk 128x128, adress 0x3C)
 
 > [!IMPORTANT]
-> **Hailege-modulens VCC MÅSTE kopplas till +5V!**  
-> 1.5"-modulen har en inbyggd 3.3V LDO-regulator (662K) och en skyddsdiod. Om den matas med 3.3V får styrchippet bara ~2.7V, vilket gör att skärmen inte tänds. Anslut till **5V (pin 4 eller 5V-plint)**.
->
-> **Stiftordning på modulens kretskort (från vänster till höger):** `GND` • `VCC` • `SCL` • `SDA`
+> **Stiftordning på modulens kretskort (`128128-01-IIC VER:2.0`, från vänster till höger):** `SDA` • `SCL` • `GND` • `VCC`  
+> Modulens VCC ansluts till **+3V3** (längst upp i block 3 eller 4 på GeeekPi-kortet).
 
 | Skärm (Stift på modul) | Din kabelfärg | Pi / GeeekPi HAT | Fysisk Pin |
 |---|---|---|---|
-| **GND** (Stift 1) | **Gul** | **GND** | Pin 9 (eller valfri GND) |
-| **VCC** (Stift 2) | **Orange** | **5V** *(OBS: 5V, inte 3.3V!)* | Pin 4 (eller 5V-plint) |
-| **SCL** (Stift 3) | **Röd** | **GPIO3** (SCL) | Pin 5 |
-| **SDA** (Stift 4) | **Ljusbrun** | **GPIO2** (SDA) | Pin 3 |
+| **SDA** (Stift 1) | **Brun** | **GPIO2** (SDA, block 1 plint 3) | Pin 3 |
+| **SCL** (Stift 2) | **Röd** | **GPIO3** (SCL, block 1 plint 4) | Pin 5 |
+| **GND** (Stift 3) | **Gul** | **GND** (valfri GND-plint) | Pin 9 / 14 / GND |
+| **VCC** (Stift 4) | **Orange** | **+3V3** (block 3 eller 4 plint 1) | Pin 1 / +3V3 |
 
 Kontroll efter uppstart: `sudo i2cdetect -y 1` ska visa `3c`.
 
