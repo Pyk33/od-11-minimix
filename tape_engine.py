@@ -63,7 +63,34 @@ for dsp_candidate in [
                 ]
             break
         except Exception:
-            pass
+            _libdsp = None
+
+if _libdsp is None:
+    c_src = Path(__file__).with_name("dsp_filter.c")
+    so_dst = Path(__file__).with_name("libdsp.so")
+    if c_src.exists():
+        try:
+            os.system(f"gcc -O3 -shared -fPIC '{c_src}' -o '{so_dst}'")
+            if so_dst.exists():
+                _libdsp = ctypes.CDLL(str(so_dst))
+                _libdsp.svf_filter_block.argtypes = [
+                    ctypes.POINTER(_SVFState),
+                    ctypes.POINTER(ctypes.c_float),
+                    ctypes.c_int,
+                    ctypes.c_float
+                ]
+                if hasattr(_libdsp, "echo_init"):
+                    _libdsp.echo_init.argtypes = [ctypes.POINTER(_EchoState), ctypes.c_int]
+                    _libdsp.echo_process_block.argtypes = [
+                        ctypes.POINTER(_EchoState),
+                        ctypes.POINTER(ctypes.c_float),
+                        ctypes.POINTER(ctypes.c_float),
+                        ctypes.c_int,
+                        ctypes.c_float,
+                        ctypes.c_float
+                    ]
+        except Exception:
+            _libdsp = None
 
 # --------------------------------------------------------------------------- #
 # Konstanter & Standardvärden
@@ -804,14 +831,16 @@ class TapeEngine:
                         # Användaren scratchar bakåt i musikhistorien från LIVE
                         self.is_live = False
                         rate = self._velocity_est
-                        gain = 1.4 if rate < 200 else (3.0 if rate < 600 else (8.0 if rate < 1200 else 16.0))
-                        back_dist = abs(steps * int(SAMPLES_PER_STEP * gain))
-                        min_scratch = int(0.35 * self.sr)
-                        back_dist = max(min_scratch, back_dist)
-                        self.head_pos = (live_edge - back_dist) % self.tape.max_frames
-                        # Resamplingshastighet bakåt: musikalisk vinyl scratch (max -1.8x, inte -6.0x squeal)
-                        self.speed = float(np.clip(-0.4 - (rate / 600.0), -1.8, -0.3))
+                        gain = 1.0 if rate < 150 else (2.0 if rate < 400 else (4.0 if rate < 1000 else 8.0))
+                        delta_samples = steps * int(SAMPLES_PER_STEP * gain)
+                        min_scratch = int(0.20 * self.sr)
+                        delta_samples = -max(min_scratch, abs(delta_samples))
+                        self.head_pos = (live_edge + delta_samples) % self.tape.max_frames
+                        # Resamplingshastighet bakåt: musikalisk vinyl scratch
+                        self.speed = float(np.clip(-0.35 - (rate / 600.0), -1.8, -0.3))
+                        step_frames = frames_needed * self.speed
                         pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                        self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
                         out = self.tape.read_interp(pos)
                         if _libdsp is not None:
                             out = np.ascontiguousarray(out, dtype=np.float32)
@@ -834,7 +863,7 @@ class TapeEngine:
                             self.head_pos = (self.head_pos + nudge) % self.tape.max_frames
                         return self.tape.read_interp(pos)
 
-                hand_on_wheel = (now - self.last_touch_time <= self.release_timeout)
+                # Vi är bakåt i bandet
                 steps = self._pending_tape_steps
                 self._pending_tape_steps = 0
 
@@ -842,24 +871,22 @@ class TapeEngine:
                     current_behind = (live_edge - self.head_pos) % self.tape.max_frames
                     behind_sec = current_behind / self.sr if current_behind < self.tape.max_frames / 2 else 0.0
 
-                    if steps > 0:
-                        # SUPER SPOOL FRAMÅT MOT LIVE:
-                        # Flerstegs hastighetsacceleration anpassad för stor rotor
-                        rate = self._velocity_est
-                        if rate > 2000:
-                            gain = 30.0
-                        elif rate > 1200:
-                            gain = 18.0
-                        elif rate > 600:
-                            gain = 10.0
-                        elif rate > 300:
-                            gain = 4.5
-                        elif rate > 150:
-                            gain = 2.2
-                        else:
-                            gain = 1.4
+                    rate = self._velocity_est
+                    if rate > 2000:
+                        gain = 16.0
+                    elif rate > 1200:
+                        gain = 10.0
+                    elif rate > 600:
+                        gain = 6.0
+                    elif rate > 300:
+                        gain = 3.0
+                    elif rate > 150:
+                        gain = 1.8
+                    else:
+                        gain = 1.0
 
-                        # Avstånds-boost: om man är långt bakom (>10s eller >25s) spolas det ännu snabbare
+                    if steps > 0:
+                        # Spolar framåt mot LIVE
                         if behind_sec > 25.0:
                             gain *= 2.0
                         elif behind_sec > 10.0:
@@ -870,33 +897,20 @@ class TapeEngine:
 
                         # Magnet-lås mot LIVE vid nära eller passerat
                         if (delta_samples >= current_behind or
-                            current_behind <= int(0.35 * self.sr) or
+                            current_behind <= int(0.12 * self.sr) or
                             current_behind > self.tape.max_frames / 2):
-                            # BERGFAST LÅSNING VID LIVE (t-0)!
                             self.head_pos = live_edge
                             self.is_live = True
                             self.speed = 1.0
+                            pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                            self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+                            return self.tape.read_interp(pos)
                         else:
                             self.head_pos = (self.head_pos + delta_samples) % self.tape.max_frames
-                            # Resamplingshastighet (tonhöjd): behåll i ett musikaliskt intervall (max 2.0x, inte 6.0x squeal!)
                             self.speed = float(np.clip(1.0 + (rate / 600.0), 1.0, 2.0))
 
                     else:
-                        # BAKÅT: Responsiv vinylscratch med dynamisk hastighetsacceleration
-                        rate = self._velocity_est
-                        if rate > 2000:
-                            gain = 22.0
-                        elif rate > 1200:
-                            gain = 14.0
-                        elif rate > 600:
-                            gain = 7.0
-                        elif rate > 300:
-                            gain = 3.5
-                        elif rate > 150:
-                            gain = 1.8
-                        else:
-                            gain = 1.0
-
+                        # BAKÅT: Responsiv vinylscratch
                         effective_step = int(SAMPLES_PER_STEP * gain)
                         delta_samples = steps * effective_step
                         back_dist = abs(delta_samples)
@@ -906,37 +920,32 @@ class TapeEngine:
                         else:
                             self.head_pos = (self.head_pos + delta_samples) % self.tape.max_frames
 
-                        # Resamplingshastighet bakåt: musikalisk vinyl-tonhöjd (mellan -0.2x och -1.8x)
                         self.speed = float(np.clip(-0.35 - (rate / 700.0), -1.8, -0.2))
 
-                elif hand_on_wheel:
-                    # Handen vilar på hjulet i bandhistoriken (scratch paus)
-                    self.speed += (0.0 - self.speed) * 0.5
-                    if abs(self.speed) < 0.05:
-                        self.speed = 0.0
-                        return np.zeros((frames_needed, CHANNELS), dtype=np.float32)
-
                 else:
-                    # Handen släppt -> tallriken accelererar mjukt tillbaka till 1.0x
+                    # Inga nya steg denna cykel: Tallriken har tröghet och glider mjukt mot 1.0x (normal framåt)
                     if self.speed < 1.0:
-                        self.speed += (1.0 - self.speed) * 0.35
-                        if abs(self.speed - 1.0) < 0.04:
+                        self.speed += (1.0 - self.speed) * 0.18
+                        if abs(self.speed - 1.0) < 0.03:
                             self.speed = 1.0
                     elif self.speed > 1.0:
-                        self.speed += (1.0 - self.speed) * 0.45
-                        if abs(self.speed - 1.0) < 0.04:
+                        self.speed += (1.0 - self.speed) * 0.25
+                        if abs(self.speed - 1.0) < 0.03:
                             self.speed = 1.0
 
                     behind_head = (live_edge - self.head_pos) % self.tape.max_frames
                     step_frames = frames_needed * self.speed
-                    if step_frames > 0 and (step_frames >= behind_head or behind_head <= int(0.35 * self.sr) or behind_head > self.tape.max_frames / 2):
+                    if step_frames > 0 and (step_frames >= behind_head or behind_head <= int(0.12 * self.sr) or behind_head > self.tape.max_frames / 2):
                         self.head_pos = live_edge
                         self.is_live = True
                         self.speed = 1.0
-                    else:
-                        self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
+                        pos = (self.head_pos + np.arange(frames_needed)) % self.tape.max_frames
+                        self.head_pos = (self.head_pos + frames_needed) % self.tape.max_frames
+                        return self.tape.read_interp(pos)
 
+                step_frames = frames_needed * self.speed
                 pos = (self.head_pos + np.arange(frames_needed) * self.speed) % self.tape.max_frames
+                self.head_pos = (self.head_pos + step_frames) % self.tape.max_frames
                 out = self.tape.read_interp(pos)
 
                 # Anti-squeal bandhuvudsdämpning: dämpar skarpa diskantskrik när bandet spolas snabbt eller bakåt

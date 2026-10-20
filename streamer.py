@@ -1375,7 +1375,8 @@ def ui_loop(device):
         if last is None or ImageChops.difference(img, last).getbbox():
             device.display(img)
             last = img
-        stop_event.wait(1 / 30 if animating else 0.1)
+        # 20 FPS ger silkeslen animering och lämnar 90%+ CPU/GIL ledigt för ALSA-ljudet
+        stop_event.wait(1 / 20 if animating else 0.1)
 
 
 # --------------------------------------------------------------------------- #
