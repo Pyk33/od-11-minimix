@@ -168,20 +168,16 @@ class Hitster(Game):
         return None
 
     # --- rendering -------------------------------------------------------- #
+    # --- rendering -------------------------------------------------------- #
     def _header(self, d, tag, right=""):
-        c = self.ctx
-        d.rectangle([0, 0, 8 + c.text_w(d, tag, c.F_XS), 12], fill=255)
-        d.text((4, 1), tag, font=c.F_XS, fill=0)
-        if right:
-            d.text((c.W_MAIN - c.text_w(d, right, c.F_XS) - 2, 1), right, font=c.F_XS, fill=255)
-        d.line([(0, 14), (c.W_MAIN, 14)], fill=255)
+        self.ctx.draw_header(d, tag, right, self.ctx.W)
 
     def _ctext(self, d, y, s, font, fill=255):
         c = self.ctx
-        d.text(((c.W_MAIN - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
+        d.text(((c.W - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
 
     def _sidebar(self, d, items):
-        self.ctx.draw_control_sidebar(d, items)
+        self.ctx.draw_control_bar(d, items, self.ctx.W, self.ctx.H)
 
     def render(self, d, t):
         return getattr(self, "_r_" + self.phase.lower())(d, t)
@@ -189,21 +185,20 @@ class Hitster(Game):
     def _r_nosongs(self, d, t):
         self._header(d, "HITSTER")
         self._ctext(d, 30, "NO SONGS", self.ctx.F_MD)
-        for i, line in enumerate(("RUN ON PI:", "hitster_", "import.py", "<PLAYLIST>")):
+        for i, line in enumerate(("RUN ON PI:", "hitster_import.py", "<PLAYLIST>")):
             self._ctext(d, 54 + i * 12, line, self.ctx.F_XS)
-        self._sidebar(d, [("", ""), ("top_tap", "BACK"), ("", ""), ("", ""), ("btm_hold", "HOME")])
+        self._sidebar(d, [("top_tap", "BACK"), ("btm_tap", "HOME")])
         return False
 
     def _r_setup(self, d, t):
         c = self.ctx
-        self._header(d, "HITSTER")
-        self._ctext(d, 20, "PLAYERS", c.F_SM)
-        self._ctext(d, 34, str(self.players), c.F_BIG)
-        self._ctext(d, 72, f"GOAL {self.goal} CARDS", c.F_SM)
-        self._ctext(d, 92, f"{len(self.songs)} SONGS", c.F_XS)
-        self._ctext(d, 106, "PRESS PLAY", c.F_XS)
-        self._sidebar(d, [("rot", "PLRS"), ("top_tap", "START"), ("top_hold", "MENU"),
-                          ("btm_tap", "GOAL"), ("btm_hold", "HOME")])
+        self._header(d, "HITSTER", "SETUP")
+        self._ctext(d, 18, "PLAYERS", c.F_SM)
+        self._ctext(d, 32, str(self.players), c.F_BIG)
+        self._ctext(d, 62, f"GOAL: {self.goal} CARDS", c.F_SM)
+        self._ctext(d, 80, f"{len(self.songs)} SONGS LOADED", c.F_XS)
+        self._ctext(d, 94, "PRESS PLAY TO START", c.F_XS)
+        self._sidebar(d, [("rot", "PLRS"), ("top_tap", "START"), ("btm_tap", "GOAL")])
         return False
 
     def _r_pass(self, d, t):
@@ -211,18 +206,18 @@ class Hitster(Game):
         tl = self.timelines[self.cur]
         self._header(d, f"P{self.cur + 1}", f"{len(tl)}/{self.goal}")
         self._ctext(d, 22, "YOUR TURN", c.F_SM)
-        self._ctext(d, 38, f"P{self.cur + 1}", c.F_XL)
+        self._ctext(d, 38, f"PLAYER {self.cur + 1}", c.F_MD)
         if int(t * 2) % 2 == 0:
-            self._ctext(d, 92, "PLAY = GO", c.F_SM)
-        self._ribbon(d, 108, tl, None)
-        self._sidebar(d, [("", ""), ("top_tap", "GO"), ("top_hold", "MENU"), ("", ""), ("btm_hold", "HOME")])
+            self._ctext(d, 70, "PRESS GO TO PLAY", c.F_SM)
+        self._ribbon(d, 94, tl, None)
+        self._sidebar(d, [("top_tap", "GO"), ("btm_tap", "MENU")])
         return True
 
     def _ribbon(self, d, y, tl, slot):
-        """Tidslinjeremsa: en tick per kort + markör för vald plats."""
+        """Tidslinjeremsa över hela widescreen-bredden: en tick per kort + markör för vald plats."""
         c = self.ctx
         n = len(tl)
-        x0, x1 = 4, c.W_MAIN - 6
+        x0, x1 = 6, c.W - 6
         sp = (x1 - x0) / max(1, n)
         d.line([(x0, y + 6), (x1, y + 6)], fill=255)
         for i in range(n):
@@ -241,61 +236,69 @@ class Hitster(Game):
             self._ctext(d, 44, "NEXT = RETRY", c.F_XS)
         else:
             # Animerad equalizer så man ser att musik spelas
-            for i in range(9):
-                h = 3 + int(9 * abs(math.sin(t * 5 + i * 1.3)))
+            num_eq = 14
+            for i in range(num_eq):
+                h = 3 + int(9 * abs(math.sin(t * 5 + i * 0.8)))
                 x = 8 + i * 8
-                d.rectangle([x, 36 - h, x + 4, 36], fill=255)
-            self._ctext(d, 40, "WHEN WAS IT?", c.F_XS)
+                d.rectangle([x, 34 - h, x + 5, 34], fill=255)
+            self._ctext(d, 38, "WHERE DOES IT FIT?", c.F_XS)
 
         left = str(tl[self.slot - 1]["year"]) if self.slot > 0 else "----"
         right = str(tl[self.slot]["year"]) if self.slot < len(tl) else "----"
-        d.text((1, 62), left, font=c.F_SM, fill=255)
-        d.rectangle([28, 56, 54, 76], outline=255)
-        self._ctext_in(d, 28, 54, 58, "?", c.F_MD)
-        d.text((c.W_MAIN - c.text_w(d, right, c.F_SM) - 1, 62), right, font=c.F_SM, fill=255)
-        d.text((2, 80), "<" if self.slot > 0 else " ", font=c.F_XS, fill=255)
-        d.text((c.W_MAIN - 8, 80), ">" if self.slot < len(tl) else " ", font=c.F_XS, fill=255)
 
-        self._ribbon(d, 90, tl, self.slot)
-        d.text((2, 116), str(tl[0]["year"]), font=c.F_XS, fill=255)
-        last = str(tl[-1]["year"])
-        d.text((c.W_MAIN - c.text_w(d, last, c.F_XS) - 2, 116), last, font=c.F_XS, fill=255)
-        self._sidebar(d, [("rot", "SLOT"), ("top_tap", "LOCK"), ("top_hold", "MENU"),
-                          ("btm_tap", "AGAIN"), ("btm_hold", "HOME")])
+        # Vänster år-kort
+        d.rectangle([6, 50, 42, 70], outline=255)
+        self._ctext_in(d, 6, 42, 55, left, c.F_SM)
+
+        # Aktiv plats (?) med blinkande ram
+        blink = (int(t * 4) % 2 == 0)
+        d.rectangle([48, 48, 80, 72], fill=255 if blink else 0, outline=255)
+        self._ctext_in(d, 48, 80, 52, "?", c.F_MD, fill=0 if blink else 255)
+
+        # Höger år-kort
+        d.rectangle([86, 50, 122, 70], outline=255)
+        self._ctext_in(d, 86, 122, 55, right, c.F_SM)
+
+        self._ribbon(d, 78, tl, self.slot)
+        d.text((6, 98), f"SLOT {self.slot + 1}/{len(tl) + 1}", font=c.F_XS, fill=255)
+        d.text((c.W - 6 - c.text_w(d, f"{tl[0]['year']}-{tl[-1]['year']}", c.F_XS), 98),
+               f"{tl[0]['year']}-{tl[-1]['year']}", font=c.F_XS, fill=255)
+
+        self._sidebar(d, [("rot", "SLOT"), ("top_tap", "LOCK"), ("btm_tap", "AGAIN")])
         return True
 
-    def _ctext_in(self, d, x0, x1, y, s, font):
-        d.text((x0 + (x1 - x0 - self.ctx.text_w(d, s, font)) / 2, y), s, font=font, fill=255)
+    def _ctext_in(self, d, x0, x1, y, s, font, fill=255):
+        d.text((x0 + (x1 - x0 - self.ctx.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
 
     def _r_reveal(self, d, t):
         c = self.ctx
         tl = self.timelines[self.cur]
         self._header(d, f"P{self.cur + 1}", f"{len(tl)}/{self.goal}")
-        self._ctext(d, 20, str(self.song["year"]), c.F_BIG)
-        banner = "RIGHT!" if self.correct else "WRONG"
+        self._ctext(d, 18, str(self.song["year"]), c.F_BIG)
+        banner = "CORRECT! +1 PT" if self.correct else f"WRONG! ({self.song['year']})"
         if self.correct or int(t * 3) % 2 == 0:
-            d.rectangle([8, 52, c.W_MAIN - 10, 66], fill=255)
-            self._ctext(d, 53, banner, c.F_SM, fill=0)
+            d.rectangle([8, 46, c.W - 8, 62], fill=255)
+            self._ctext(d, 49, banner, c.F_SM, fill=0)
         else:
-            d.rectangle([8, 52, c.W_MAIN - 10, 66], outline=255)
-            self._ctext(d, 53, banner, c.F_SM)
-        c.marquee(d, (2, 72), self.song["title"], c.F_SM, c.W_MAIN - 4, t)
-        c.marquee(d, (2, 86), self.song["artist"], c.F_XS, c.W_MAIN - 4, t)
-        self._ribbon(d, 104, tl, None)
-        self._sidebar(d, [("", ""), ("top_tap", "NEXT"), ("top_hold", "MENU"), ("", ""), ("btm_hold", "HOME")])
+            d.rectangle([8, 46, c.W - 8, 62], outline=255)
+            self._ctext(d, 49, banner, c.F_SM)
+        c.marquee(d, (4, 68), self.song["title"], c.F_SM, c.W - 8, t)
+        c.marquee(d, (4, 84), self.song["artist"], c.F_XS, c.W - 8, t)
+        self._ribbon(d, 96, tl, None)
+        self._sidebar(d, [("top_tap", "NEXT"), ("btm_tap", "MENU")])
         return True
 
     def _r_win(self, d, t):
         c = self.ctx
-        self._header(d, "HITSTER")
+        self._header(d, "HITSTER", "WINNER!")
         if int(t * 2) % 2 == 0:
-            d.rectangle([4, 18, c.W_MAIN - 6, 64], fill=255)
-            self._ctext(d, 20, f"P{self.cur + 1}", c.F_XL, fill=0)
+            d.rectangle([8, 18, c.W - 8, 54], fill=255)
+            self._ctext(d, 22, f"P{self.cur + 1} WINS!", c.F_MD, fill=0)
         else:
-            d.rectangle([4, 18, c.W_MAIN - 6, 64], outline=255)
-            self._ctext(d, 20, f"P{self.cur + 1}", c.F_XL)
-        self._ctext(d, 68, "WINS!", c.F_MD)
+            d.rectangle([8, 18, c.W - 8, 54], outline=255)
+            self._ctext(d, 22, f"P{self.cur + 1} WINS!", c.F_MD)
+        self._ctext(d, 60, f"REACHED {self.goal} CARDS!", c.F_SM)
         for i, tl in enumerate(self.timelines):
-            d.text((4, 88 + i * 10), f"P{i + 1}  {len(tl)} CARDS", font=c.F_XS, fill=255)
-        self._sidebar(d, [("", ""), ("top_tap", "DONE"), ("", ""), ("", ""), ("btm_hold", "HOME")])
+            d.text((8, 78 + i * 10), f"PLAYER {i + 1}: {len(tl)} CARDS", font=c.F_XS, fill=255)
+        self._sidebar(d, [("top_tap", "AGAIN"), ("btm_tap", "MENU")])
         return True

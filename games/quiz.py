@@ -93,17 +93,13 @@ class MusicQuiz(Game):
         return None
 
     # --- rendering -------------------------------------------------------- #
+    # --- rendering -------------------------------------------------------- #
     def _header(self, d, tag, right=""):
-        c = self.ctx
-        d.rectangle([0, 0, 8 + c.text_w(d, tag, c.F_XS), 12], fill=255)
-        d.text((4, 1), tag, font=c.F_XS, fill=0)
-        if right:
-            d.text((c.W_MAIN - c.text_w(d, right, c.F_XS) - 2, 1), right, font=c.F_XS, fill=255)
-        d.line([(0, 14), (c.W_MAIN, 14)], fill=255)
+        self.ctx.draw_header(d, tag, right, self.ctx.W)
 
     def _ctext(self, d, y, s, font, fill=255):
         c = self.ctx
-        d.text(((c.W_MAIN - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
+        d.text(((c.W - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
 
     def render(self, d, t):
         if self.phase == "GUESS":
@@ -113,66 +109,60 @@ class MusicQuiz(Game):
 
     def _r_guess(self, d, t):
         c = self.ctx
-        self._header(d, "QUIZ", f"#{self.track_num}")
+        self._header(d, "QUIZ", f"TRACK #{self.track_num}")
 
-        # Animerad equalizer i mitten
-        for i in range(11):
-            h = 4 + int(14 * abs(math.sin(t * 6 + i * 0.85)))
-            x = 6 + i * 7
-            d.rectangle([x, 50 - h, x + 4, 50], fill=255)
+        # Mystery soundwave box över widescreen-bredden
+        w_box = [8, 18, c.W - 8, 62]
+        d.rectangle(w_box, outline=255)
+        for x in range(12, c.W - 12):
+            yw = 40 + int(math.sin(x * 0.22 + t * 4.0) * 11)
+            d.point([(x, yw)], fill=255)
 
-        # Frågetecken-ruta
-        d.rectangle([14, 58, c.W_MAIN - 16, 82], outline=255)
-        self._ctext(d, 62, "? ? ?", c.F_MD)
+        # Frågetecken-ruta i mitten
+        d.rectangle([54, 30, 74, 50], fill=255)
+        self._ctext(d, 33, "?", c.F_MD, fill=0)
 
-        # Poängrad
+        # Rubrik & speltips
+        self._ctext(d, 68, "GUESS TITLE & ARTIST", c.F_SM)
+
+        # Poängrad (passar snyggt i 128px bredd)
         pts = f"P1:{self.scores[0]} P2:{self.scores[1]} P3:{self.scores[2]} P4:{self.scores[3]}"
-        if c.text_w(d, pts, c.F_XS) > c.W_MAIN - 4:
-            pts = f"SCORE {self.scores[0]}-{self.scores[1]}-{self.scores[2]}-{self.scores[3]}"
-        self._ctext(d, 94, pts, c.F_XS)
+        self._ctext(d, 86, pts, c.F_XS)
 
-        # Speltips
         if int(t * 2) % 2 == 0:
-            self._ctext(d, 110, "PLAY = REVEAL", c.F_XS)
+            self._ctext(d, 99, "PRESS REVEAL TO CHECK", c.F_XS)
 
-        c.draw_control_sidebar(d, [
-            ("", ""),
+        c.draw_control_bar(d, [
             ("top_tap", "REVEAL"),
-            ("top_hold", "MENU"),
             ("btm_tap", "SKIP"),
-            ("btm_hold", "HOME")
-        ])
+        ], c.W, c.H)
         return True
 
     def _r_reveal(self, d, t):
         c = self.ctx
-        self._header(d, "QUIZ", f"#{self.track_num}")
+        self._header(d, "QUIZ", "REVEAL")
 
-        # Avslöjad titel och artist med mjuk scroll (marquee)
-        c.marquee(d, (2, 22), self.current_title, c.F_MD, c.W_MAIN - 4, t)
-        c.marquee(d, (2, 40), self.current_artist, c.F_SM, c.W_MAIN - 4, t)
+        # Avslöjad titel och artist med mjuk widescreen marquee
+        c.marquee(d, (4, 18), self.current_title, c.F_MD, c.W - 8, t)
+        c.marquee(d, (4, 34), self.current_artist, c.F_SM, c.W - 8, t)
 
-        # Utdelning av poäng
+        # Avdelare
+        d.line([(0, 50), (c.W - 1, 50)], fill=255)
+        self._ctext(d, 54, "AWARD POINT TO:", c.F_XS)
+
+        # Spelarval i inverterad ruta
         p_idx = self.awarding_player
-        d.line([(0, 60), (c.W_MAIN, 60)], fill=255)
-        self._ctext(d, 66, f"GIVE POINT TO:", c.F_XS)
-
-        # Spelarval
-        p_tag = f"P{p_idx + 1} ({self.scores[p_idx]} PTS)"
-        d.rectangle([10, 80, c.W_MAIN - 12, 98], fill=255)
-        self._ctext(d, 82, p_tag, c.F_SM, fill=0)
+        p_tag = f"PLAYER {p_idx + 1} ({self.scores[p_idx]} PTS)"
+        d.rectangle([14, 66, c.W - 14, 84], fill=255)
+        self._ctext(d, 69, p_tag, c.F_SM, fill=0)
 
         # Poängöversikt
         score_line = f"P1:{self.scores[0]} P2:{self.scores[1]} P3:{self.scores[2]} P4:{self.scores[3]}"
-        if c.text_w(d, score_line, c.F_XS) > c.W_MAIN - 4:
-            score_line = f"SCORE {self.scores[0]}-{self.scores[1]}-{self.scores[2]}-{self.scores[3]}"
-        self._ctext(d, 106, score_line, c.F_XS)
+        self._ctext(d, 94, score_line, c.F_XS)
 
-        c.draw_control_sidebar(d, [
+        c.draw_control_bar(d, [
             ("rot", "PLR"),
             ("top_tap", "NEXT"),
-            ("top_hold", "MENU"),
             ("btm_tap", "+1 PT"),
-            ("btm_hold", "HOME")
-        ])
+        ], c.W, c.H)
         return True

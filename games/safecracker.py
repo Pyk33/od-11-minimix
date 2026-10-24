@@ -161,17 +161,13 @@ class SafeCracker(Game):
         return None
 
     # --- rendering -------------------------------------------------------- #
+    # --- rendering -------------------------------------------------------- #
     def _header(self, d, tag, right=""):
-        c = self.ctx
-        d.rectangle([0, 0, 8 + c.text_w(d, tag, c.F_XS), 12], fill=255)
-        d.text((4, 1), tag, font=c.F_XS, fill=0)
-        if right:
-            d.text((c.W_MAIN - c.text_w(d, right, c.F_XS) - 2, 1), right, font=c.F_XS, fill=255)
-        d.line([(0, 14), (c.W_MAIN, 14)], fill=255)
+        self.ctx.draw_header(d, tag, right, self.ctx.W)
 
     def _ctext(self, d, y, s, font, fill=255):
         c = self.ctx
-        d.text(((c.W_MAIN - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
+        d.text(((c.W - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
 
     def render(self, d, t):
         now = time.monotonic()
@@ -197,22 +193,22 @@ class SafeCracker(Game):
         sec_left = int(math.ceil(self.time_left))
         self._header(d, "VAULT", f"{sec_left}s")
 
-        # Stift-indikatorer högst upp (Tumbler 1, 2, 3)
+        # Stift-indikatorer centrerade högst upp (Tumbler 1, 2, 3)
         for i in range(3):
-            tx = 10 + i * 24
+            tx = 30 + i * 26
             if i < self.current_tumbler:
-                d.rectangle([tx, 18, tx + 16, 28], fill=255)
-                d.text((tx + 3, 19), f"L{i + 1}", font=c.F_XS, fill=0)
+                d.rectangle([tx, 16, tx + 18, 26], fill=255)
+                d.text((tx + 3, 17), f"L{i + 1}", font=c.F_XS, fill=0)
             elif i == self.current_tumbler:
                 if int(t * 4) % 2 == 0:
-                    d.rectangle([tx, 18, tx + 16, 28], outline=255)
-                    d.text((tx + 3, 19), f"L{i + 1}", font=c.F_XS, fill=255)
+                    d.rectangle([tx, 16, tx + 18, 26], outline=255)
+                    d.text((tx + 3, 17), f"L{i + 1}", font=c.F_XS, fill=255)
             else:
-                d.rectangle([tx, 18, tx + 16, 28], outline=255)
-                d.text((tx + 3, 19), "-", font=c.F_XS, fill=255)
+                d.rectangle([tx, 16, tx + 18, 26], outline=255)
+                d.text((tx + 5, 17), "-", font=c.F_XS, fill=255)
 
-        # Kassaskåpsskiva (Rotary Dial)
-        cx, cy, r = 41, 64, 27
+        # Kassaskåpsskiva (Rotary Dial) centrerad vid cx=64
+        cx, cy, r = 64, 58, 24
         d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=255)
 
         # Roterande markeringar (sträck längs kanten)
@@ -226,79 +222,71 @@ class SafeCracker(Game):
             d.line([(x1, y1), (x2, y2)], fill=255)
 
         # Pil / indikator i toppen
-        d.polygon([(cx, cy - r - 4), (cx - 3, cy - r - 8), (cx + 3, cy - r - 8)], fill=255)
+        d.polygon([(cx, cy - r - 3), (cx - 3, cy - r - 7), (cx + 3, cy - r - 7)], fill=255)
 
         # Stor siffervisning i mitten av skivan
         dial_str = f"{self.current_dial:02d}"
-        d.ellipse([cx - 15, cy - 15, cx + 15, cy + 15], fill=0)
-        self._ctext(d, cy - 9, dial_str, c.F_MD)
+        d.ellipse([cx - 13, cy - 13, cx + 13, cy + 13], fill=0)
+        self._ctext(d, cy - 8, dial_str, c.F_MD)
 
         # Seismisk nål / Tension meter
-        d.line([(4, 102), (c.W_MAIN - 6, 102)], fill=255)
-        needle_w = int((c.W_MAIN - 10) * self.tension)
+        d.text((6, 90), "TENSION", font=c.F_XS, fill=255)
+        d.line([(48, 95), (c.W - 6, 95)], fill=255)
+        needle_w = int((c.W - 54) * self.tension)
         if needle_w > 0:
-            d.rectangle([4, 100, 4 + needle_w, 104], fill=255)
+            d.rectangle([48, 92, 48 + needle_w, 98], fill=255)
 
-        # Litet akustiskt fladder vid nära träff
+        # Akustiskt fladder vid nära träff
         if self.tension > 0.6:
             flad = int(4 * math.sin(t * 30))
-            d.line([(4 + needle_w, 98 + flad), (4 + needle_w, 106 - flad)], fill=255)
+            d.line([(48 + needle_w, 90 + flad), (48 + needle_w, 100 - flad)], fill=255)
 
         # Fel-flash vid misslyckad sättning
         if now < self.error_flash:
-            d.rectangle([0, 14, c.W_MAIN, c.H - 1], outline=255)
+            d.rectangle([0, 14, c.W - 1, c.H - 1], outline=255)
 
-        c.draw_control_sidebar(d, [
+        c.draw_control_bar(d, [
             ("rot", "DIAL"),
             ("top_tap", "SET"),
-            ("top_hold", "MENU"),
-            ("", ""),
-            ("btm_hold", "HOME")
-        ])
+            ("btm_tap", "RESET"),
+        ], c.W, c.H)
         return True
 
     def _r_win(self, d, t):
         c = self.ctx
         self._header(d, "VAULT", "OPEN!")
         if int(t * 3) % 2 == 0:
-            d.rectangle([4, 24, c.W_MAIN - 6, 68], fill=255)
-            self._ctext(d, 28, "CRACKED!", c.F_MD, fill=0)
-            self._ctext(d, 48, "SAFE OPEN", c.F_SM, fill=0)
+            d.rectangle([8, 20, c.W - 8, 58], fill=255)
+            self._ctext(d, 24, "CRACKED!", c.F_MD, fill=0)
+            self._ctext(d, 42, "SAFE UNLOCKED", c.F_SM, fill=0)
         else:
-            d.rectangle([4, 24, c.W_MAIN - 6, 68], outline=255)
-            self._ctext(d, 28, "CRACKED!", c.F_MD)
-            self._ctext(d, 48, "SAFE OPEN", c.F_SM)
+            d.rectangle([8, 20, c.W - 8, 58], outline=255)
+            self._ctext(d, 24, "CRACKED!", c.F_MD)
+            self._ctext(d, 42, "SAFE UNLOCKED", c.F_SM)
 
-        code_str = f"{self.combo[0]:02d}-{self.combo[1]:02d}-{self.combo[2]:02d}"
-        self._ctext(d, 78, f"CODE: {code_str}", c.F_XS)
-        self._ctext(d, 94, f"{int(self.time_left)}s LEFT", c.F_XS)
-        self._ctext(d, 110, "PLAY = AGAIN", c.F_XS)
+        code_str = f"{self.combo[0]:02d} - {self.combo[1]:02d} - {self.combo[2]:02d}"
+        self._ctext(d, 68, f"CODE: {code_str}", c.F_SM)
+        self._ctext(d, 88, f"TIME REMAINING: {int(self.time_left)}S", c.F_XS)
 
-        c.draw_control_sidebar(d, [
-            ("", ""),
+        c.draw_control_bar(d, [
             ("top_tap", "AGAIN"),
-            ("top_hold", "MENU"),
-            ("btm_tap", "EXIT"),
-            ("btm_hold", "HOME")
-        ])
+            ("btm_tap", "MENU"),
+        ], c.W, c.H)
         return True
 
     def _r_gameover(self, d, t):
         c = self.ctx
-        self._header(d, "VAULT", "ALARM")
-        d.rectangle([4, 28, c.W_MAIN - 6, 68], outline=255)
-        self._ctext(d, 36, "ALARM!", c.F_MD)
-        self._ctext(d, 54, "BUSTED", c.F_SM)
+        self._header(d, "VAULT", "ALARM!")
+        d.rectangle([8, 22, c.W - 8, 62], outline=255)
+        self._ctext(d, 28, "ALARM TRIGGERED!", c.F_SM)
+        self._ctext(d, 44, "BUSTED", c.F_MD)
 
-        code_str = f"{self.combo[0]:02d}-{self.combo[1]:02d}-{self.combo[2]:02d}"
-        self._ctext(d, 82, f"WAS: {code_str}", c.F_XS)
-        self._ctext(d, 108, "PLAY = RETRY", c.F_XS)
+        code_str = f"{self.combo[0]:02d} - {self.combo[1]:02d} - {self.combo[2]:02d}"
+        self._ctext(d, 74, f"CODE WAS: {code_str}", c.F_XS)
+        self._ctext(d, 92, "LOCKDOWN ENGAGED", c.F_XS)
 
-        c.draw_control_sidebar(d, [
-            ("", ""),
+        c.draw_control_bar(d, [
             ("top_tap", "RETRY"),
-            ("top_hold", "MENU"),
-            ("btm_tap", "EXIT"),
-            ("btm_hold", "HOME")
-        ])
+            ("btm_tap", "MENU"),
+        ], c.W, c.H)
         return True

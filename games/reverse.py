@@ -155,17 +155,13 @@ class ReverseDetective(Game):
         return None
 
     # --- rendering -------------------------------------------------------- #
+    # --- rendering -------------------------------------------------------- #
     def _header(self, d, tag, right=""):
-        c = self.ctx
-        d.rectangle([0, 0, 8 + c.text_w(d, tag, c.F_XS), 12], fill=255)
-        d.text((4, 1), tag, font=c.F_XS, fill=0)
-        if right:
-            d.text((c.W_MAIN - c.text_w(d, right, c.F_XS) - 2, 1), right, font=c.F_XS, fill=255)
-        d.line([(0, 14), (c.W_MAIN, 14)], fill=255)
+        self.ctx.draw_header(d, tag, right, self.ctx.W)
 
     def _ctext(self, d, y, s, font, fill=255):
         c = self.ctx
-        d.text(((c.W_MAIN - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
+        d.text(((c.W - c.text_w(d, s, font)) / 2, y), s, font=font, fill=fill)
 
     def render(self, d, t):
         if self.phase == "CAPTURE":
@@ -182,92 +178,81 @@ class ReverseDetective(Game):
     def _r_capture(self, d, t):
         c = self.ctx
         self._header(d, "REVERSE", "REC")
-        self._ctext(d, 26, "CAPTURING...", c.F_SM)
+        self._ctext(d, 22, "SAMPLING SPOTIFY...", c.F_SM)
 
-        # Rullande framåt-spolar
+        # Rullande framåt-spolar över hela widescreen-bredden
         angle = t * 6.0
         if hasattr(c, "draw_tape_reel"):
-            c.draw_tape_reel(d, 22, 58, 14, angle)
-            c.draw_tape_reel(d, 60, 58, 14, angle * 0.9)
-        else:
-            d.rectangle([18, 46, 64, 70], outline=255)
+            c.draw_tape_reel(d, 36, 50, 16, angle)
+            c.draw_tape_reel(d, 92, 50, 16, angle * 0.9)
+            d.line([(36, 34), (92, 34)], fill=255)
+            d.line([(36, 66), (92, 66)], fill=255)
 
         # Progress bar för inspelning
         elapsed = min(self.capture_dur, time.monotonic() - self.capture_start)
         prog = elapsed / self.capture_dur
-        bar_w = c.W_MAIN - 8
-        d.rectangle([4, 88, 4 + bar_w, 94], outline=255)
-        d.rectangle([4, 88, 4 + int(bar_w * prog), 94], fill=255)
+        bar_w = c.W - 16
+        d.rectangle([8, 80, 8 + bar_w, 86], outline=255)
+        d.rectangle([8, 80, 8 + int(bar_w * prog), 86], fill=255)
 
-        self._ctext(d, 104, "LISTEN CLOSELY", c.F_XS)
-        c.draw_control_sidebar(d, [
-            ("", ""),
-            ("", ""),
-            ("top_hold", "MENU"),
-            ("", ""),
-            ("btm_hold", "HOME")
-        ])
+        self._ctext(d, 96, "RECORDING REVERSE BUFFER", c.F_XS)
+        c.draw_control_bar(d, [("top_tap", "CANCEL"), ("btm_tap", "HOME")], c.W, c.H)
         return True
 
     def _r_guess(self, d, t):
         c = self.ctx
-        self._header(d, "REVERSE", "<<")
+        self._header(d, "REVERSE", "BACKWARDS <<")
 
         # Rullande baklänges-spolar (moturs rotation!)
         angle = -t * 5.0
         if hasattr(c, "draw_tape_reel"):
-            c.draw_tape_reel(d, 22, 42, 13, angle)
-            c.draw_tape_reel(d, 60, 42, 13, angle * 1.1)
+            c.draw_tape_reel(d, 36, 44, 16, angle)
+            c.draw_tape_reel(d, 92, 44, 16, angle * 1.1)
+            d.line([(36, 28), (92, 28)], fill=255)
+            d.line([(36, 60), (92, 60)], fill=255)
 
         # Baklänges-banner
         if int(t * 2.5) % 2 == 0:
-            d.rectangle([6, 64, c.W_MAIN - 8, 80], fill=255)
-            self._ctext(d, 66, "REVERSE <<", c.F_SM, fill=0)
+            d.rectangle([8, 68, c.W - 8, 84], fill=255)
+            self._ctext(d, 70, "REVERSE PLAYBACK <<", c.F_SM, fill=0)
         else:
-            d.rectangle([6, 64, c.W_MAIN - 8, 80], outline=255)
-            self._ctext(d, 66, "REVERSE <<", c.F_SM)
+            d.rectangle([8, 68, c.W - 8, 84], outline=255)
+            self._ctext(d, 70, "REVERSE PLAYBACK <<", c.F_SM)
 
         # Ledtråd
         if self.show_hint and self.current_song:
             year = self.current_song.get("year", "????")
             decade = f"{(year // 10) * 10}s" if isinstance(year, int) else "POP"
-            self._ctext(d, 88, f"HINT: {decade} ({year})", c.F_XS)
+            self._ctext(d, 94, f"HINT: {decade} ({year})", c.F_XS)
         else:
-            self._ctext(d, 88, "WHAT SONG IS IT?", c.F_XS)
+            self._ctext(d, 94, "GUESS THE SONG!", c.F_XS)
 
-        self._ctext(d, 108, "FLIP TO REVEAL", c.F_XS)
-
-        c.draw_control_sidebar(d, [
-            ("", ""),
+        c.draw_control_bar(d, [
+            ("rot", "LOOP"),
             ("top_tap", "FLIP!"),
-            ("top_hold", "MENU"),
             ("btm_tap", "HINT"),
-            ("btm_hold", "HOME")
-        ])
+        ], c.W, c.H)
         return True
 
     def _r_reveal(self, d, t):
         c = self.ctx
-        self._header(d, "SOLVED!", ">>")
+        self._header(d, "REVERSE", "REVEALED >>")
 
         # Framåt-rullar som snurrar med musiken
         angle = t * 4.0
         if hasattr(c, "draw_tape_reel"):
-            c.draw_tape_reel(d, 18, 32, 9, angle)
-            c.draw_tape_reel(d, 64, 32, 9, angle)
+            c.draw_tape_reel(d, 36, 30, 12, angle)
+            c.draw_tape_reel(d, 92, 30, 12, angle)
+            d.line([(36, 18), (92, 18)], fill=255)
+            d.line([(36, 42), (92, 42)], fill=255)
 
         if self.current_song:
-            self._ctext(d, 46, str(self.current_song.get("year", "")), c.F_BIG)
-            c.marquee(d, (2, 74), self.current_song.get("title", ""), c.F_SM, c.W_MAIN - 4, t)
-            c.marquee(d, (2, 90), self.current_song.get("artist", ""), c.F_XS, c.W_MAIN - 4, t)
+            self._ctext(d, 48, str(self.current_song.get("year", "")), c.F_BIG)
+            c.marquee(d, (4, 72), self.current_song.get("title", ""), c.F_SM, c.W - 8, t)
+            c.marquee(d, (4, 88), self.current_song.get("artist", ""), c.F_XS, c.W - 8, t)
 
-        self._ctext(d, 110, "PLAY = NEXT", c.F_XS)
-
-        c.draw_control_sidebar(d, [
-            ("", ""),
+        c.draw_control_bar(d, [
             ("top_tap", "NEXT"),
-            ("top_hold", "MENU"),
             ("btm_tap", "REPLAY"),
-            ("btm_hold", "HOME")
-        ])
+        ], c.W, c.H)
         return True
