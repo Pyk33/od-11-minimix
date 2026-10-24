@@ -50,6 +50,11 @@ except ImportError:
     websocket = None
 
 try:
+    import games as games_pkg   # minispel (Hitster m.fl.)
+except Exception as _ge:
+    games_pkg = None
+
+try:
     import tape_engine
     tape = tape_engine.TapeEngine(sample_rate=48000, tape_minutes=int(os.environ.get("TAPE_MINUTES", "15")))
     alsa_bridge = tape_engine.AlsaTapeBridge(
@@ -113,6 +118,7 @@ F_XS = load_font(9)
 F_SM = load_font(10)
 F_MD = load_font(13)
 F_XL = load_font(40)
+F_BIG = load_font(24)
 
 # --------------------------------------------------------------------------- #
 # Delat tillstånd
@@ -141,6 +147,22 @@ stop_event = threading.Event()
 
 def touch():
     state["last_input"] = time.monotonic()
+
+
+_games_mgr = None
+
+
+def get_games():
+    """Skapar minispelshubben första gången (W/H är då slutgiltigt satta av main())."""
+    global _games_mgr
+    if _games_mgr is None and games_pkg is not None:
+        ctx = games_pkg.GameContext(
+            W=W, H=H, W_MAIN=W_MAIN, F_XS=F_XS, F_SM=F_SM, F_MD=F_MD, F_BIG=F_BIG, F_XL=F_XL,
+            text_w=text_w, marquee=marquee, draw_control_sidebar=draw_control_sidebar,
+            api_call=api_call,
+        )
+        _games_mgr = games_pkg.GameManager(ctx)
+    return _games_mgr
 
 
 # --------------------------------------------------------------------------- #
@@ -211,6 +233,14 @@ def on_rotated():
 
     with lock:
         current_mode = state["mode"]
+
+    if current_mode == "GAMES":
+        mgr = get_games()
+        if mgr:
+            mgr.rotate(steps)
+            with lock:
+                touch()
+        return
 
     if current_mode != "VOL" and tape is not None:
         # OB-4 lägen: styr bandspolning, looplängd eller drönarklangfärg
@@ -337,7 +367,7 @@ def spotify_events_loop():
 # --------------------------------------------------------------------------- #
 # Uppspelningsstyrning
 # --------------------------------------------------------------------------- #
-def api_call(method, path, body=None):
+def api_call(method, path, body=None, timeout=1.0):
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         headers = {"Content-Type": "application/json"}
@@ -346,7 +376,7 @@ def api_call(method, path, body=None):
         headers = {}
     req = urllib.request.Request(API + path, method=method, data=data, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=1.0) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             body = r.read()
             return json.loads(body) if body else {}
     except Exception:
@@ -443,6 +473,13 @@ def do_mute():
 def on_btn_play_short():
     with lock:
         m = state["mode"]
+    if m == "GAMES":
+        mgr = get_games()
+        if mgr:
+            mgr.button("play")
+        with lock:
+            touch()
+        return
     if m == "VOL":
         do_playpause()
     elif m == "TAPE":
@@ -472,6 +509,13 @@ def on_btn_play_short():
 def on_btn_play_long():
     with lock:
         m = state["mode"]
+    if m == "GAMES":
+        mgr = get_games()
+        if mgr:
+            mgr.button("play_hold")
+        with lock:
+            touch()
+        return
     if m == "VOL":
         behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
         if behind_sec > 1.0:
@@ -513,6 +557,22 @@ def on_btn_next_short():
         m = state["mode"]
     if m == "VOL":
         do_next()
+    elif m == "DJ" and get_games() is not None:
+        # Sista fliken i cirkeln (TAPE -> LOOP -> DJ) -> MINISPEL
+        if tape:
+            tape.set_mode(tape.MODE_VOL)     # rena ljudet medan man spelar
+        get_games().enter()
+        with lock:
+            state["mode"] = "GAMES"
+            touch()
+    elif m == "GAMES":
+        if get_games().button("next") == "leave":      # hubben: nästa flik = TAPE igen
+            if tape:
+                tape.set_mode(tape.MODE_TAPE)
+            with lock:
+                state["mode"] = "TAPE"
+        with lock:
+            touch()
     else:
         # Växla mellan de kreativa OB-4 lägena: TAPE <-> LOOP
         nxt = tape.cycle_mode() if tape else "VOL"
@@ -528,6 +588,8 @@ def on_btn_next_short():
 def on_btn_next_long():
     with lock:
         m = state["mode"]
+    if m == "GAMES" and get_games() is not None:
+        get_games().exit()     # pausar ev. spel-låt och tystar spelet
     if m == "VOL":
         # Gå in i OB-4 TAPE mode!
         if tape:
@@ -1212,6 +1274,11 @@ def render(t):
             w = text_w(d, line, F_MD)
             d.text(((W - w) / 2, 14 + i * 18), line, font=F_MD, fill=255)
         return img, False
+
+    # --- Minispel -----------------------------------------------------------
+    if s["mode"] == "GAMES" and get_games() is not None:
+        get_games().render(d, t)
+        return img, True
 
     # --- OB-4 & DJ Speciallägen (TAPE, LOOP & DJ) ----------------------------
     if s["mode"] == "TAPE":

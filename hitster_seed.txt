@@ -1,0 +1,403 @@
+# Hitster startlista – en låt per rad: Artist - Titel
+# Rader som börjar med # ignoreras. Lägg gärna till egna!
+# Importera med: python3 hitster_import.py hitster_seed.txt
+# (Spotify-länk hittas via sökning, årtalet kontrolleras mot MusicBrainz.)
+
+# --- 1950-tal ---
+Elvis Presley - Hound Dog
+Elvis Presley - Jailhouse Rock
+Chuck Berry - Johnny B. Goode
+Bill Haley & His Comets - Rock Around the Clock
+Little Richard - Tutti Frutti
+Buddy Holly - That'll Be the Day
+Jerry Lee Lewis - Great Balls of Fire
+Ray Charles - What'd I Say
+Louis Armstrong - What a Wonderful World
+Frank Sinatra - Fly Me to the Moon
+
+# --- 1960-tal ---
+The Beatles - Hey Jude
+The Beatles - Yesterday
+The Beatles - Let It Be
+The Beatles - Come Together
+The Rolling Stones - (I Can't Get No) Satisfaction
+The Rolling Stones - Paint It, Black
+Bob Dylan - Like a Rolling Stone
+The Beach Boys - Good Vibrations
+The Kinks - You Really Got Me
+The Who - My Generation
+Jimi Hendrix - Purple Haze
+The Doors - Light My Fire
+Aretha Franklin - Respect
+Otis Redding - (Sittin' On) The Dock of the Bay
+Simon & Garfunkel - The Sound of Silence
+The Supremes - Baby Love
+Marvin Gaye - I Heard It Through the Grapevine
+Creedence Clearwater Revival - Proud Mary
+Percy Sledge - When a Man Loves a Woman
+Tom Jones - It's Not Unusual
+Nancy Sinatra - These Boots Are Made for Walkin'
+The Animals - The House of the Rising Sun
+Cream - Sunshine of Your Love
+The Monkees - I'm a Believer
+
+# --- 1970-tal ---
+Queen - Bohemian Rhapsody
+Led Zeppelin - Stairway to Heaven
+Pink Floyd - Wish You Were Here
+Pink Floyd - Another Brick in the Wall, Pt. 2
+Eagles - Hotel California
+Fleetwood Mac - Go Your Own Way
+David Bowie - Space Oddity
+David Bowie - Heroes
+Elton John - Rocket Man
+Elton John - Your Song
+John Lennon - Imagine
+ABBA - Dancing Queen
+ABBA - Waterloo
+ABBA - Mamma Mia
+ABBA - Fernando
+Bee Gees - Stayin' Alive
+Donna Summer - I Feel Love
+Gloria Gaynor - I Will Survive
+Boney M. - Rasputin
+Boney M. - Daddy Cool
+Sweet - Ballroom Blitz
+T. Rex - Get It On
+Deep Purple - Smoke on the Water
+Lynyrd Skynyrd - Sweet Home Alabama
+Stevie Wonder - Superstition
+Stevie Wonder - Sir Duke
+Bob Marley & The Wailers - No Woman, No Cry
+Bob Marley & The Wailers - Is This Love
+Earth, Wind & Fire - September
+Chic - Le Freak
+Blondie - Heart of Glass
+Sex Pistols - Anarchy in the U.K.
+The Clash - London Calling
+Ramones - Blitzkrieg Bop
+Supertramp - The Logical Song
+10cc - I'm Not in Love
+Carpenters - Close to You
+Carole King - You've Got a Friend
+Don McLean - American Pie
+Neil Young - Heart of Gold
+Bruce Springsteen - Born to Run
+Billy Joel - Piano Man
+AC/DC - Highway to Hell
+Kiss - I Was Made for Lovin' You
+Rod Stewart - Maggie May
+Cat Stevens - Wild World
+Eric Clapton - Layla
+Santana - Black Magic Woman
+Dr. Hook - Sylvia's Mother
+Wings - Band on the Run
+Electric Light Orchestra - Mr. Blue Sky
+Barry White - You're the First, the Last, My Everything
+
+# --- 1980-tal ---
+Michael Jackson - Billie Jean
+Michael Jackson - Thriller
+Michael Jackson - Beat It
+Prince - Purple Rain
+Prince - When Doves Cry
+Madonna - Like a Virgin
+Madonna - La Isla Bonita
+Madonna - Like a Prayer
+Whitney Houston - I Wanna Dance with Somebody (Who Loves Me)
+Cyndi Lauper - Girls Just Want to Have Fun
+Cyndi Lauper - Time After Time
+a-ha - Take On Me
+Duran Duran - Hungry Like the Wolf
+Wham! - Last Christmas
+Wham! - Wake Me Up Before You Go-Go
+George Michael - Careless Whisper
+Tears for Fears - Everybody Wants to Rule the World
+Eurythmics - Sweet Dreams (Are Made of This)
+Depeche Mode - Enjoy the Silence
+The Police - Every Breath You Take
+Dire Straits - Money for Nothing
+Dire Straits - Sultans of Swing
+U2 - With or Without You
+U2 - Sunday Bloody Sunday
+Bon Jovi - Livin' on a Prayer
+Guns N' Roses - Sweet Child o' Mine
+Europe - The Final Countdown
+Roxette - The Look
+Roxette - It Must Have Been Love
+Ace of Base - All That She Wants
+Bruce Springsteen - Dancing in the Dark
+Phil Collins - In the Air Tonight
+Phil Collins - Another Day in Paradise
+Toto - Africa
+Journey - Don't Stop Believin'
+Survivor - Eye of the Tiger
+Queen - Another One Bites the Dust
+Queen - Don't Stop Me Now
+Rick Astley - Never Gonna Give You Up
+Bonnie Tyler - Total Eclipse of the Heart
+Kate Bush - Running Up That Hill (A Deal with God)
+The Cure - Boys Don't Cry
+Joy Division - Love Will Tear Us Apart
+New Order - Blue Monday
+Bill Withers - Lovely Day
+Lionel Richie - Hello
+Billy Idol - White Wedding
+Pet Shop Boys - West End Girls
+Soft Cell - Tainted Love
+Human League - Don't You Want Me
+Yazoo - Only You
+Kim Wilde - Kids in America
+Falco - Rock Me Amadeus
+Nena - 99 Luftballons
+Van Halen - Jump
+Def Leppard - Pour Some Sugar on Me
+Metallica - Master of Puppets
+Run-D.M.C. - Walk This Way
+Beastie Boys - (You Gotta) Fight for Your Right (To Party!)
+Bobby McFerrin - Don't Worry Be Happy
+Berlin - Take My Breath Away
+Starship - Nothing's Gonna Stop Us Now
+Foreigner - I Want to Know What Love Is
+Simple Minds - Don't You (Forget About Me)
+Spandau Ballet - True
+Culture Club - Karma Chameleon
+Kenny Loggins - Danger Zone
+
+# --- 1990-tal ---
+Nirvana - Smells Like Teen Spirit
+Nirvana - Come as You Are
+Pearl Jam - Alive
+Red Hot Chili Peppers - Under the Bridge
+Oasis - Wonderwall
+Oasis - Don't Look Back in Anger
+Blur - Song 2
+Radiohead - Creep
+Green Day - Basket Case
+The Verve - Bitter Sweet Symphony
+Spice Girls - Wannabe
+Backstreet Boys - I Want It That Way
+Britney Spears - ...Baby One More Time
+Celine Dion - My Heart Will Go On
+Mariah Carey - Hero
+Whitney Houston - I Will Always Love You
+Alanis Morissette - You Oughta Know
+TLC - No Scrubs
+Destiny's Child - Say My Name
+Aqua - Barbie Girl
+Vengaboys - Boom, Boom, Boom, Boom!!
+Eiffel 65 - Blue (Da Ba Dee)
+Haddaway - What Is Love
+Snap! - Rhythm Is a Dancer
+2 Unlimited - No Limit
+Culture Beat - Mr. Vain
+Dr. Alban - It's My Life
+Ace of Base - The Sign
+Robyn - Show Me Love
+Cardigans - Lovefool
+Roxette - Joyride
+Dr. Dre - Still D.R.E.
+2Pac - California Love
+The Notorious B.I.G. - Juicy
+Coolio - Gangsta's Paradise
+Fugees - Killing Me Softly with His Song
+Will Smith - Men in Black
+Eric Clapton - Tears in Heaven
+R.E.M. - Losing My Religion
+Metallica - Nothing Else Matters
+Guns N' Roses - November Rain
+Bryan Adams - (Everything I Do) I Do It for You
+Boyz II Men - End of the Road
+Sinead O'Connor - Nothing Compares 2 U
+Massive Attack - Teardrop
+The Prodigy - Firestarter
+Fatboy Slim - Right Here, Right Now
+Chumbawamba - Tubthumping
+Hanson - MMMBop
+Cher - Believe
+Ricky Martin - Livin' la Vida Loca
+Lou Bega - Mambo No. 5 (A Little Bit of...)
+Shania Twain - Man! I Feel Like a Woman!
+Savage Garden - Truly Madly Deeply
+Lenny Kravitz - Are You Gonna Go My Way
+Soundgarden - Black Hole Sun
+Smashing Pumpkins - 1979
+Weezer - Buddy Holly
+Cranberries - Zombie
+Eagle-Eye Cherry - Save Tonight
+Texas - Say What You Want
+No Doubt - Don't Speak
+Right Said Fred - I'm Too Sexy
+
+# --- 2000-tal ---
+Eminem - Lose Yourself
+Eminem - Stan
+Outkast - Hey Ya!
+Outkast - Ms. Jackson
+Beyoncé - Crazy in Love
+Beyoncé - Single Ladies (Put a Ring on It)
+Rihanna - Umbrella
+Rihanna - Don't Stop the Music
+Britney Spears - Toxic
+Christina Aguilera - Beautiful
+Kelly Clarkson - Since U Been Gone
+Avril Lavigne - Complicated
+Amy Winehouse - Rehab
+Coldplay - Yellow
+Coldplay - Viva la Vida
+Coldplay - Clocks
+The Killers - Mr. Brightside
+Green Day - Boulevard of Broken Dreams
+Linkin Park - In the End
+Linkin Park - Numb
+Evanescence - Bring Me to Life
+The White Stripes - Seven Nation Army
+The Strokes - Last Nite
+Franz Ferdinand - Take Me Out
+Arctic Monkeys - I Bet You Look Good on the Dancefloor
+Kings of Leon - Sex on Fire
+Muse - Supermassive Black Hole
+Daft Punk - One More Time
+Daft Punk - Harder, Better, Faster, Stronger
+Justin Timberlake - Cry Me a River
+Justin Timberlake - SexyBack
+Usher - Yeah!
+50 Cent - In da Club
+Kanye West - Gold Digger
+Black Eyed Peas - I Gotta Feeling
+Black Eyed Peas - Where Is the Love?
+Shakira - Hips Don't Lie
+Gnarls Barkley - Crazy
+Norah Jones - Don't Know Why
+Alicia Keys - Fallin'
+Lady Gaga - Poker Face
+Lady Gaga - Just Dance
+Katy Perry - I Kissed a Girl
+Timbaland - Apologize
+Journey - Don't Stop Believin'
+Mika - Grace Kelly
+Duffy - Mercy
+Adele - Chasing Pavements
+Robyn - Dancing On My Own
+The Hives - Hate to Say I Told You So
+Mando Diao - Gloria
+Kent - Dom Andra
+Håkan Hellström - Känn ingen sorg för mig Göteborg
+Basshunter - Now You're Gone
+Daniel Powter - Bad Day
+James Blunt - You're Beautiful
+Gorillaz - Feel Good Inc.
+Snow Patrol - Chasing Cars
+Maroon 5 - This Love
+Nelly Furtado - Maneater
+Sean Paul - Get Busy
+Ludacris - Stand Up
+Akon - Smack That
+Natasha Bedingfield - Unwritten
+Scissor Sisters - I Don't Feel Like Dancin'
+Rammstein - Sonne
+Evanescence - My Immortal
+
+# --- 2010-tal ---
+Adele - Rolling in the Deep
+Adele - Someone Like You
+Adele - Hello
+Ed Sheeran - Shape of You
+Ed Sheeran - Thinking Out Loud
+Bruno Mars - Uptown Funk
+Bruno Mars - Just the Way You Are
+Mark Ronson - Uptown Funk
+Pharrell Williams - Happy
+Daft Punk - Get Lucky
+Taylor Swift - Shake It Off
+Taylor Swift - Blank Space
+Katy Perry - Firework
+Katy Perry - Roar
+Lady Gaga - Bad Romance
+Rihanna - We Found Love
+Rihanna - Diamonds
+Beyoncé - Halo
+Justin Bieber - Sorry
+The Weeknd - Blinding Lights
+The Weeknd - Can't Feel My Face
+Drake - Hotline Bling
+Kendrick Lamar - HUMBLE.
+Post Malone - Rockstar
+Lorde - Royals
+Sam Smith - Stay with Me
+Imagine Dragons - Radioactive
+Imagine Dragons - Believer
+Fun. - We Are Young
+Gotye - Somebody That I Used to Know
+Carly Rae Jepsen - Call Me Maybe
+PSY - Gangnam Style
+LMFAO - Party Rock Anthem
+Avicii - Wake Me Up
+Avicii - Levels
+Swedish House Mafia - Don't You Worry Child
+Calvin Harris - This Is What You Came For
+Calvin Harris - Summer
+Zara Larsson - Lush Life
+Tove Lo - Habits (Stay High)
+Tove Lo - Talking Body
+Icona Pop - I Love It
+Mans Zelmerlöw - Heroes
+Loreen - Euphoria
+Eric Saade - Popular
+Lukas Graham - 7 Years
+Passenger - Let Her Go
+Hozier - Take Me to Church
+Ellie Goulding - Love Me Like You Do
+Meghan Trainor - All About That Bass
+Charlie Puth - See You Again
+Wiz Khalifa - See You Again
+Maroon 5 - Sugar
+Maroon 5 - Moves like Jagger
+One Direction - What Makes You Beautiful
+Coldplay - Hymn for the Weekend
+Twenty One Pilots - Stressed Out
+Justin Timberlake - Can't Stop the Feeling!
+Macklemore & Ryan Lewis - Thrift Shop
+Robin Thicke - Blurred Lines
+Miley Cyrus - Wrecking Ball
+Sia - Chandelier
+Shawn Mendes - Treat You Better
+Camila Cabello - Havana
+Luis Fonsi - Despacito
+Cardi B - Bodak Yellow
+Dua Lipa - New Rules
+Billie Eilish - bad guy
+Lizzo - Truth Hurts
+
+# --- 2020-tal ---
+Dua Lipa - Levitating
+Dua Lipa - Don't Start Now
+Harry Styles - As It Was
+Harry Styles - Watermelon Sugar
+Olivia Rodrigo - drivers license
+Olivia Rodrigo - good 4 u
+Lil Nas X - Old Town Road
+Lil Nas X - MONTERO (Call Me By Your Name)
+Doja Cat - Say So
+Doja Cat - Kiss Me More
+Glass Animals - Heat Waves
+Måneskin - Beggin'
+Tones and I - Dance Monkey
+Roddy Ricch - The Box
+Miley Cyrus - Flowers
+Taylor Swift - Anti-Hero
+SZA - Kill Bill
+Billie Eilish - What Was I Made For?
+Bad Bunny - Tití Me Preguntó
+Kate Bush - Running Up That Hill (A Deal with God)
+Ed Sheeran - Bad Habits
+Adele - Easy On Me
+Sabrina Carpenter - Espresso
+Chappell Roan - Good Luck, Babe!
+Zara Larsson - Never Forget You
+Tate McRae - greedy
+Rema - Calm Down
+Lewis Capaldi - Someone You Loved
+Post Malone - Circles
+Jason Derulo - Savage Love (Laxed - Siren Beat)
+BTS - Dynamite

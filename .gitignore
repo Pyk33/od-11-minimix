@@ -2,3 +2,5 @@
 venv/
 __pycache__/
 *.so
+scratch/
+hitster_*cache.json

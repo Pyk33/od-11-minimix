@@ -588,9 +588,11 @@
         <span class="flow-step-badge">2. TAPE (Magic Tape)</span>
         <span class="flow-arrow">◀──(Klicka Next)──▶</span>
         <span class="flow-step-badge">3. LOOP (Looper)</span>
+        <span class="flow-arrow">──(Klicka Next)──▶</span>
+        <span class="flow-step-badge" style="background:#ff3333; color:#fff;">4. GAMES (Hitster m.fl.)</span>
       </div>
       <div style="font-size:12.5px; color:var(--text-muted); margin-top:4px;">
-        💡 <strong>Tips:</strong> Håll in <strong>Next</strong> i &gt;0,5 sekunder från TAPE eller LOOP för att omedelbart återgå till standardläget (VOL). Musiken fortsätter alltid spela sömlöst framåt från exakt den punkt nålen befinner sig på!
+        💡 <strong>Tips:</strong> Håll in <strong>Next</strong> i &gt;0,5 sekunder från vilket läge som helst för att omedelbart återgå till standardläget (VOL).
       </div>
     </div>
 
@@ -749,12 +751,73 @@
             <tr>
               <td><span class="ctrl-key">Nedre knapp</span></td>
               <td>Kort tryck</td>
-              <td><span class="ctrl-action">Växla tillbaka till TAPE-läget</span></td>
+              <td><span class="ctrl-action">Växla vidare till GAMES-läget (eller TAPE)</span></td>
             </tr>
             <tr>
               <td><span class="ctrl-key">Nedre knapp</span></td>
               <td>Håll intryckt (&gt;0,5 s)</td>
               <td><span class="ctrl-action">Återgå till VOL-läget</span><div class="ctrl-extra">Musiken fortsätter spela sömlöst framåt från loopen in i resten av låten!</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Läge 4: GAMES -->
+      <div class="mode-detail-card" style="border-left: 4px solid #ff3333;">
+        <div class="mode-card-header">
+          <div class="mode-title-wrap">
+            <span class="mode-number">LÄGE 4</span>
+            <h3 class="mode-name">GAMES — Minispel & Hitster</h3>
+          </div>
+          <span class="mode-badge-oled" style="background:#ff3333; color:#fff;">GAMES</span>
+        </div>
+        <p class="mode-summary">
+          En dedikerad spelskärm för OD-11 Minimix! Första spelet är en komplett anpassning av <strong>Hitster</strong> för 1–4 spelare. En hemlig låt spelas upp via Spotify mitt i spåret. Vrid ratten för att placera låten på din växande tidslinje, klicka Play för att låsa svaret och se det historiskt verifierade årtalet avslöjas. Först till målet vinner!
+        </p>
+
+        <table class="controls-table">
+          <thead>
+            <tr>
+              <th style="width:26%">Reglage</th>
+              <th style="width:28%">Handling</th>
+              <th>Vad som händer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="ctrl-key">Ratten (i Hub)</span></td>
+              <td>Vrid medurs / moturs</td>
+              <td><span class="ctrl-action">Bläddra mellan minispel</span><div class="ctrl-extra">Välj HITSTER eller framtida spel.</div></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Övre knapp (i Hub)</span></td>
+              <td>Kort klick</td>
+              <td><span class="ctrl-action">Starta valt spel</span></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Ratten (i Hitster)</span></td>
+              <td>Vrid</td>
+              <td><span class="highlight-action">Välj antal spelare</span> (i setup) eller <span class="highlight-action">Flytta tidslinjens markör</span> mellan dina kort</td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Övre knapp (i Hitster)</span></td>
+              <td>Kort klick</td>
+              <td><span class="ctrl-action">Lås din gissning / Nästa tur</span></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Övre knapp</span></td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
+              <td><span class="ctrl-action">Avbryt och återgå till spelmenyn</span></td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Nedre knapp (i Hitster)</span></td>
+              <td>Kort tryck</td>
+              <td><span class="ctrl-action">Spela om ljudklippet (AGAIN)</span> / ändra målkort i setup</td>
+            </tr>
+            <tr>
+              <td><span class="ctrl-key">Nedre knapp</span></td>
+              <td>Håll intryckt (&gt;0,5 s)</td>
+              <td><span class="ctrl-action">Återgå direkt till musik & VOL</span> (pausar spelet)</td>
             </tr>
           </tbody>
         </table>
