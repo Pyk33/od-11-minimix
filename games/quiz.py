@@ -130,11 +130,12 @@ class MusicQuiz(Game):
         self._ctext(d, 86, pts, c.F_XS)
 
         if int(t * 2) % 2 == 0:
-            self._ctext(d, 99, "PRESS REVEAL TO CHECK", c.F_XS)
+            self._ctext(d, 96, "PRESS REVEAL TO CHECK", c.F_XS)
 
         c.draw_control_bar(d, [
-            ("top_tap", "REVEAL"),
+            ("top_tap", "REVL"),
             ("btm_tap", "SKIP"),
+            ("btm_hold", "MENU"),
         ], c.W, c.H)
         return True
 
@@ -158,11 +159,12 @@ class MusicQuiz(Game):
 
         # Poängöversikt
         score_line = f"P1:{self.scores[0]} P2:{self.scores[1]} P3:{self.scores[2]} P4:{self.scores[3]}"
-        self._ctext(d, 94, score_line, c.F_XS)
+        self._ctext(d, 93, score_line, c.F_XS)
 
         c.draw_control_bar(d, [
             ("rot", "PLR"),
             ("top_tap", "NEXT"),
             ("btm_tap", "+1 PT"),
+            ("btm_hold", "MENU"),
         ], c.W, c.H)
         return True

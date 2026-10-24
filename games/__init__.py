@@ -45,7 +45,8 @@ class GameContext:
 
         ABBREV = {
             "FILTER": "FLTR", "PLAYERS": "PLRS", "PLAYER": "PLR",
-            "CANCEL": "BACK", "REVERSE": "REV", "REPLAY": "RPLY", "RESET": "RST"
+            "CANCEL": "BACK", "REVERSE": "REV", "REPLAY": "RPLY",
+            "RESET": "RST", "REVEAL": "REVL",
         }
         clean = []
         for it in items:
@@ -60,57 +61,93 @@ class GameContext:
         if not clean:
             return
 
-        if len(clean) > 3:
-            sel = []
-            for pref in ("rot", "top_tap", "btm_tap"):
-                found = next((x for x in clean if x[0] == pref), None)
-                if found:
-                    sel.append(found)
-            if len(sel) >= 2:
-                clean = sel
-            else:
-                clean = clean[:3]
-
-        y_bar = h - 15
+        y_bar = h - 21
         d.line([(0, y_bar), (w - 1, y_bar)], fill=255)
 
-        n = len(clean)
-        col_w = w / n
+        rot_item = next((lbl for g, lbl in clean if g == "rot"), None)
+        top_tap = next((lbl for g, lbl in clean if g in ("top_tap", "top")), None)
+        top_hold = next((lbl for g, lbl in clean if g == "top_hold"), None)
+        btm_tap = next((lbl for g, lbl in clean if g in ("btm_tap", "btm")), None)
+        btm_hold = next((lbl for g, lbl in clean if g == "btm_hold"), None)
 
-        for i, (glyph, label) in enumerate(clean):
-            x0 = int(i * col_w)
-            x1 = int((i + 1) * col_w) if i < n - 1 else w - 1
+        has_known = any(x is not None for x in (rot_item, top_tap, top_hold, btm_tap, btm_hold))
 
-            if i > 0 and n <= 3:
-                d.line([(x0, y_bar + 4), (x0, h - 4)], fill=255)
+        if has_known:
+            d.line([(42, y_bar + 2), (42, h - 2)], fill=255)
+            d.line([(85, y_bar + 2), (85, h - 2)], fill=255)
 
-            tw = self.text_w(d, label, font) if hasattr(self, "text_w") else d.textlength(label, font=font)
-            glyph_w = 6 if glyph in ("rot", "top_tap", "top_hold", "btm_tap", "btm_hold", "top", "btm") else 0
-            gap = 2 if glyph_w > 0 else 0
-            total_w = glyph_w + gap + tw
+            def render_slot(gx_start, gy, glyph_type, text):
+                tw = self.text_w(d, text, font) if hasattr(self, "text_w") else d.textlength(text, font=font)
+                glyph_w = 6
+                gap = 2
+                total = glyph_w + gap + tw
+                content_x = max(gx_start + 2, gx_start + (42 - total) // 2)
 
-            content_x = x0 + int((x1 - x0 - total_w) / 2)
-            content_x = max(x0 + 2, content_x)
-            gy = y_bar + 4
-            ty = y_bar + 2
+                gx = content_x
+                gy_g = gy + 1
+                if glyph_type == "rot":
+                    d.ellipse([gx, gy_g, gx + 5, gy_g + 5], outline=255)
+                    d.point([(gx + 2, gy_g + 2), (gx + 2, gy_g + 3)], fill=255)
+                elif glyph_type in ("top_tap", "top"):
+                    d.polygon([(gx + 2, gy_g), (gx, gy_g + 5), (gx + 5, gy_g + 5)], fill=255)
+                elif glyph_type == "top_hold":
+                    d.polygon([(gx + 2, gy_g), (gx, gy_g + 5), (gx + 5, gy_g + 5)], outline=255)
+                    d.point([(gx + 2, gy_g + 3)], fill=255)
+                elif glyph_type in ("btm_tap", "btm"):
+                    d.polygon([(gx, gy_g), (gx + 5, gy_g), (gx + 2, gy_g + 5)], fill=255)
+                elif glyph_type == "btm_hold":
+                    d.polygon([(gx, gy_g), (gx + 5, gy_g), (gx + 2, gy_g + 5)], outline=255)
+                    d.point([(gx + 2, gy_g + 2)], fill=255)
 
-            gx = content_x
-            if glyph == "rot":
-                d.ellipse([gx, gy, gx + 5, gy + 5], outline=255)
-                d.point([(gx + 2, gy + 2), (gx + 2, gy + 3)], fill=255)
-            elif glyph in ("top_tap", "top"):
-                d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], fill=255)
-            elif glyph == "top_hold":
-                d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], outline=255)
-                d.point([(gx + 2, gy + 3)], fill=255)
-            elif glyph in ("btm_tap", "btm"):
-                d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], fill=255)
-            elif glyph == "btm_hold":
-                d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], outline=255)
-                d.point([(gx + 2, gy + 2)], fill=255)
+                d.text((gx + glyph_w + gap, gy), text, font=font, fill=255)
 
-            text_x = gx + glyph_w + gap
-            d.text((text_x, ty), label, font=font, fill=255)
+            if rot_item:
+                render_slot(0, y_bar + 6, "rot", rot_item)
+
+            if top_tap and top_hold:
+                render_slot(43, y_bar + 2, "top_tap", top_tap)
+                render_slot(43, y_bar + 11, "top_hold", top_hold)
+            elif top_tap or top_hold:
+                g = "top_tap" if top_tap else "top_hold"
+                lbl = top_tap or top_hold
+                render_slot(43, y_bar + 6, g, lbl)
+
+            if btm_tap and btm_hold:
+                render_slot(86, y_bar + 2, "btm_tap", btm_tap)
+                render_slot(86, y_bar + 11, "btm_hold", btm_hold)
+            elif btm_tap or btm_hold:
+                g = "btm_tap" if btm_tap else "btm_hold"
+                lbl = btm_tap or btm_hold
+                render_slot(86, y_bar + 6, g, lbl)
+        else:
+            n = min(3, len(clean))
+            col_w = w / n
+            for i, (glyph, label) in enumerate(clean[:n]):
+                x0 = int(i * col_w)
+                x1 = int((i + 1) * col_w) if i < n - 1 else w - 1
+                if i > 0:
+                    d.line([(x0, y_bar + 2), (x0, h - 2)], fill=255)
+                tw = self.text_w(d, label, font) if hasattr(self, "text_w") else d.textlength(label, font=font)
+                glyph_w = 6 if glyph in ("rot", "top_tap", "top_hold", "btm_tap", "btm_hold", "top", "btm") else 0
+                gap = 2 if glyph_w > 0 else 0
+                total_w = glyph_w + gap + tw
+                content_x = max(x0 + 2, x0 + int((x1 - x0 - total_w) / 2))
+                gx = content_x
+                gy = y_bar + 7
+                if glyph == "rot":
+                    d.ellipse([gx, gy, gx + 5, gy + 5], outline=255)
+                    d.point([(gx + 2, gy + 2), (gx + 2, gy + 3)], fill=255)
+                elif glyph in ("top_tap", "top"):
+                    d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], fill=255)
+                elif glyph == "top_hold":
+                    d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], outline=255)
+                    d.point([(gx + 2, gy + 3)], fill=255)
+                elif glyph in ("btm_tap", "btm"):
+                    d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], fill=255)
+                elif glyph == "btm_hold":
+                    d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], outline=255)
+                    d.point([(gx + 2, gy + 2)], fill=255)
+                d.text((gx + glyph_w + gap, y_bar + 6), label, font=font, fill=255)
 
     def draw_control_sidebar(self, d, items):
         self.draw_control_bar(d, items)
@@ -234,5 +271,5 @@ class GameManager:
         if scroll + visible < len(self.classes):
             d.polygon([(c.W - 8, 68), (c.W - 12, 63), (c.W - 4, 63)], fill=255)
 
-        c.draw_control_bar(d, [("rot", "PICK"), ("top_tap", "PLAY"), ("btm_tap", "NEXT")], c.W, c.H)
+        c.draw_control_bar(d, [("rot", "PICK"), ("top_tap", "PLAY"), ("btm_tap", "NEXT"), ("btm_hold", "EXIT")], c.W, c.H)
         return False

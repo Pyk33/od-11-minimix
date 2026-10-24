@@ -773,8 +773,12 @@ def draw_header(d, badge, status="", W_val=None):
 
 def draw_control_bar(d, items, W_val=None, H_val=None):
     """
-    Ritar en kompakt och stilren Teenage Engineering-inspirerad bottenrad (y = H-15 .. H-1).
-    Ger 128px widescreen bredd (0..W-1) åt alla dashboards ovanför.
+    Ritar en Teenage Engineering-inspirerad botten-dock (y = H-21 .. H-1).
+    Stödjer 3 hårdvaru-kolumner:
+      - Col 1: Rotary knob (☉)
+      - Col 2: Övre knapp (▲ kort tryck / ▵ långt tryck)
+      - Col 3: Undre knapp (▼ kort tryck / ▿ långt tryck)
+    Ger full widescreen (128px bredd) åt dashboards ovanför (y: 0..106).
     """
     w = W_val if W_val is not None else W
     h = H_val if H_val is not None else H
@@ -788,6 +792,7 @@ def draw_control_bar(d, items, W_val=None, H_val=None):
         "REVERSE": "REV",
         "REPLAY": "RPLY",
         "RESET": "RST",
+        "REVEAL": "REVL",
     }
 
     clean = []
@@ -803,60 +808,97 @@ def draw_control_bar(d, items, W_val=None, H_val=None):
     if not clean:
         return
 
-    # Om vi fick det gamla 5-raders formatet (rot, top_tap, top_hold, btm_tap, btm_hold),
-    # välj ut de 3 primära knapparna (rot, top_tap, btm_tap)
-    if len(clean) > 3:
-        sel = []
-        for pref in ("rot", "top_tap", "btm_tap"):
-            found = next((x for x in clean if x[0] == pref), None)
-            if found:
-                sel.append(found)
-        if len(sel) >= 2:
-            clean = sel
-        else:
-            clean = clean[:3]
-
-    y_bar = h - 15
+    y_bar = h - 21
     d.line([(0, y_bar), (w - 1, y_bar)], fill=255)
 
-    n = len(clean)
-    col_w = w / n
+    rot_item = next((lbl for g, lbl in clean if g == "rot"), None)
+    top_tap = next((lbl for g, lbl in clean if g in ("top_tap", "top")), None)
+    top_hold = next((lbl for g, lbl in clean if g == "top_hold"), None)
+    btm_tap = next((lbl for g, lbl in clean if g in ("btm_tap", "btm")), None)
+    btm_hold = next((lbl for g, lbl in clean if g == "btm_hold"), None)
 
-    for i, (glyph, label) in enumerate(clean):
-        x0 = int(i * col_w)
-        x1 = int((i + 1) * col_w) if i < n - 1 else w - 1
+    has_known = any(x is not None for x in (rot_item, top_tap, top_hold, btm_tap, btm_hold))
 
-        tw = text_w(d, label, F_XS)
-        glyph_w = 6 if glyph in ("rot", "top_tap", "top_hold", "btm_tap", "btm_hold", "top", "btm") else 0
-        gap = 2 if glyph_w > 0 else 0
-        total_w = glyph_w + gap + tw
+    if has_known:
+        # Rita diskreta skiljenotcher mellan de 3 kolumnerna
+        d.line([(42, y_bar + 2), (42, h - 2)], fill=255)
+        d.line([(85, y_bar + 2), (85, h - 2)], fill=255)
 
-        # Rita diskret skiljelinje mellan kolumnerna
-        if i > 0 and n <= 3:
-            d.line([(x0, y_bar + 4), (x0, h - 4)], fill=255)
+        def render_slot(gx_start, gy, glyph_type, text):
+            tw = text_w(d, text, F_XS)
+            glyph_w = 6
+            gap = 2
+            total = glyph_w + gap + tw
+            content_x = max(gx_start + 2, gx_start + (42 - total) // 2)
 
-        content_x = x0 + int((x1 - x0 - total_w) / 2)
-        content_x = max(x0 + 2, content_x)
-        gy = y_bar + 4
-        ty = y_bar + 2
+            gx = content_x
+            gy_g = gy + 1
+            if glyph_type == "rot":
+                d.ellipse([gx, gy_g, gx + 5, gy_g + 5], outline=255)
+                d.point([(gx + 2, gy_g + 2), (gx + 2, gy_g + 3)], fill=255)
+            elif glyph_type in ("top_tap", "top"):
+                d.polygon([(gx + 2, gy_g), (gx, gy_g + 5), (gx + 5, gy_g + 5)], fill=255)
+            elif glyph_type == "top_hold":
+                d.polygon([(gx + 2, gy_g), (gx, gy_g + 5), (gx + 5, gy_g + 5)], outline=255)
+                d.point([(gx + 2, gy_g + 3)], fill=255)
+            elif glyph_type in ("btm_tap", "btm"):
+                d.polygon([(gx, gy_g), (gx + 5, gy_g), (gx + 2, gy_g + 5)], fill=255)
+            elif glyph_type == "btm_hold":
+                d.polygon([(gx, gy_g), (gx + 5, gy_g), (gx + 2, gy_g + 5)], outline=255)
+                d.point([(gx + 2, gy_g + 2)], fill=255)
 
-        gx = content_x
-        if glyph == "rot":
-            d.ellipse([gx, gy, gx + 5, gy + 5], outline=255)
-            d.point([(gx + 2, gy + 2), (gx + 2, gy + 3)], fill=255)
-        elif glyph in ("top_tap", "top"):
-            d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], fill=255)
-        elif glyph == "top_hold":
-            d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], outline=255)
-            d.point([(gx + 2, gy + 3)], fill=255)
-        elif glyph in ("btm_tap", "btm"):
-            d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], fill=255)
-        elif glyph == "btm_hold":
-            d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], outline=255)
-            d.point([(gx + 2, gy + 2)], fill=255)
+            d.text((gx + glyph_w + gap, gy), text, font=F_XS, fill=255)
 
-        text_x = gx + glyph_w + gap
-        d.text((text_x, ty), label, font=F_XS, fill=255)
+        # Col 1: Rotary
+        if rot_item:
+            render_slot(0, y_bar + 6, "rot", rot_item)
+
+        # Col 2: Top Button (Tap rad 1, Hold rad 2)
+        if top_tap and top_hold:
+            render_slot(43, y_bar + 2, "top_tap", top_tap)
+            render_slot(43, y_bar + 11, "top_hold", top_hold)
+        elif top_tap or top_hold:
+            g = "top_tap" if top_tap else "top_hold"
+            lbl = top_tap or top_hold
+            render_slot(43, y_bar + 6, g, lbl)
+
+        # Col 3: Bottom Button (Tap rad 1, Hold rad 2)
+        if btm_tap and btm_hold:
+            render_slot(86, y_bar + 2, "btm_tap", btm_tap)
+            render_slot(86, y_bar + 11, "btm_hold", btm_hold)
+        elif btm_tap or btm_hold:
+            g = "btm_tap" if btm_tap else "btm_hold"
+            lbl = btm_tap or btm_hold
+            render_slot(86, y_bar + 6, g, lbl)
+    else:
+        n = min(3, len(clean))
+        col_w = w / n
+        for i, (glyph, label) in enumerate(clean[:n]):
+            x0 = int(i * col_w)
+            x1 = int((i + 1) * col_w) if i < n - 1 else w - 1
+            if i > 0:
+                d.line([(x0, y_bar + 2), (x0, h - 2)], fill=255)
+            tw = text_w(d, label, F_XS)
+            glyph_w = 6 if glyph in ("rot", "top_tap", "top_hold", "btm_tap", "btm_hold", "top", "btm") else 0
+            gap = 2 if glyph_w > 0 else 0
+            total_w = glyph_w + gap + tw
+            content_x = max(x0 + 2, x0 + int((x1 - x0 - total_w) / 2))
+            gx = content_x
+            gy = y_bar + 7
+            if glyph == "rot":
+                d.ellipse([gx, gy, gx + 5, gy + 5], outline=255)
+                d.point([(gx + 2, gy + 2), (gx + 2, gy + 3)], fill=255)
+            elif glyph in ("top_tap", "top"):
+                d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], fill=255)
+            elif glyph == "top_hold":
+                d.polygon([(gx + 2, gy), (gx, gy + 5), (gx + 5, gy + 5)], outline=255)
+                d.point([(gx + 2, gy + 3)], fill=255)
+            elif glyph in ("btm_tap", "btm"):
+                d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], fill=255)
+            elif glyph == "btm_hold":
+                d.polygon([(gx, gy), (gx + 5, gy), (gx + 2, gy + 5)], outline=255)
+                d.point([(gx + 2, gy + 2)], fill=255)
+            d.text((gx + glyph_w + gap, y_bar + 6), label, font=F_XS, fill=255)
 
 
 def draw_control_sidebar(d, items):
@@ -923,17 +965,17 @@ def render_tape_view(d, s, t):
     else:
         sp_str = "PLAYING"
 
-    d.text((4, 76), sp_str, font=F_MD, fill=255)
+    d.text((4, 70), sp_str, font=F_MD, fill=255)
     if behind_sec >= 0.08:
         tot_s = int(round(behind_sec))
-        d.text((4, 94), f"DELAY {tot_s//60:02d}:{tot_s%60:02d}", font=F_XS, fill=255)
+        d.text((4, 85), f"DELAY {tot_s//60:02d}:{tot_s%60:02d}", font=F_XS, fill=255)
         buf_frac = min(1.0, behind_sec / 60.0)
-        d.line([(4, 105), (W - 4, 105)], fill=255)
+        d.line([(4, 97), (W - 4, 97)], fill=255)
         cx = 4 + int(buf_frac * (W - 8))
-        d.rectangle([cx - 2, 102, cx + 2, 108], fill=255)
+        d.rectangle([cx - 2, 94, cx + 2, 100], fill=255)
     else:
-        d.text((4, 94), "BUFFER READY", font=F_XS, fill=255)
-        d.text((4, 104), "TURN TO SCRUB", font=F_XS, fill=255)
+        d.text((4, 85), "BUFFER READY", font=F_XS, fill=255)
+        d.text((4, 96), "TURN TO SCRUB", font=F_XS, fill=255)
 
     if behind_sec > 0.08:
         top_tap = "MERGE"
@@ -945,7 +987,9 @@ def render_tape_view(d, s, t):
     tape_items = [
         ("rot", "SCRUB"),
         ("top_tap", top_tap),
+        ("top_hold", "LIVE"),
         ("btm_tap", "LOOP"),
+        ("btm_hold", "VOL"),
     ]
     draw_control_bar(d, tape_items, W, H)
 
@@ -995,7 +1039,7 @@ def render_loop_view(d, s, t):
 
     # 3. Låtens tidslinje (Timeline)
     tl_x0, tl_x1 = 4, W - 4
-    tl_y = 94
+    tl_y = 86
     d.line([(tl_x0, tl_y), (tl_x1, tl_y)], fill=255)
     d.line([(tl_x0, tl_y - 2), (tl_x0, tl_y + 2)], fill=255)
     d.line([(tl_x1, tl_y - 2), (tl_x1, tl_y + 2)], fill=255)
@@ -1044,12 +1088,14 @@ def render_loop_view(d, s, t):
         in_x = lx0 + int(frac * (lx1 - lx0))
         d.line([(in_x, tl_y - 3), (in_x, tl_y + 3)], fill=0)
 
-    d.text((4, 103), "[SWAP] EDIT" if loop_active else "OB-4 READY", font=F_XS, fill=255)
+    d.text((4, 96), "[SWAP] EDIT" if loop_active else "OB-4 READY", font=F_XS, fill=255)
 
     loop_items = [
-        ("rot", "LOOP" if not loop_active else edit_mode),
-        ("top_tap", "START" if not loop_active else "SWAP"),
+        ("rot", "SIZE" if loop_active else "LOOP"),
+        ("top_tap", "SWAP" if loop_active else "START"),
+        ("top_hold", "DJ"),
         ("btm_tap", "DJ"),
+        ("btm_hold", "VOL"),
     ]
     draw_control_bar(d, loop_items, W, H)
 
@@ -1192,12 +1238,14 @@ def render_dj_view(d, s, t):
         curr_x = max(bx0, min(bx1, curr_x))
         d.rectangle([curr_x - 2, tl_y - 3, curr_x + 2, tl_y + 3], fill=255)
 
-    d.text((4, 103), "BRAKE ACTIVE" if is_brake else "FILTER READY", font=F_XS, fill=255)
+    d.text((4, 96), "BRAKE ACTIVE" if is_brake else "FILTER READY", font=F_XS, fill=255)
 
     dj_items = [
-        ("rot", "FILTER"),
+        ("rot", "FLTR"),
         ("top_tap", "XFADE"),
-        ("btm_tap", "TAPE"),
+        ("top_hold", "BRAKE"),
+        ("btm_tap", "GAMES"),
+        ("btm_hold", "VOL"),
     ]
     draw_control_bar(d, dj_items, W, H)
 
@@ -1284,27 +1332,31 @@ def render(t):
             ss = int((pos // 1000) % 60)
             dur_mm = int(s["dur_ms"] // 60000)
             dur_ss = int((s["dur_ms"] // 1000) % 60)
-            d.text((2, 80), f"{mm}:{ss:02d}", font=F_XS, fill=255)
+            d.text((2, 78), f"{mm}:{ss:02d}", font=F_XS, fill=255)
             dur_str = f"{dur_mm}:{dur_ss:02d}"
-            d.text((W - 2 - text_w(d, dur_str, F_XS), 80), dur_str, font=F_XS, fill=255)
-            d.line([(2, 91), (W - 2, 91)], fill=255)
+            d.text((W - 2 - text_w(d, dur_str, F_XS), 78), dur_str, font=F_XS, fill=255)
+            d.line([(2, 87), (W - 2, 87)], fill=255)
             prog_x = 2 + int(frac * (W - 4))
-            d.rectangle([prog_x - 1, 88, prog_x + 1, 94], fill=255)
+            d.rectangle([prog_x - 1, 85, prog_x + 1, 89], fill=255)
             animating |= s["playing"]
         else:
-            d.line([(2, 91), (W - 2, 91)], fill=255)
+            d.line([(2, 87), (W - 2, 87)], fill=255)
 
         # --- Volym-mätare ---
         vtxt = "MUTE" if s["muted"] else f"VOL {s['volume']}"
-        d.text((2, 99), vtxt, font=F_XS, fill=255)
-        seg_bar(d, 44, 101, W - 46, 6, 0 if s["muted"] else s["volume"] / max(1, VOL_MAX), segs=12)
+        d.text((2, 94), vtxt, font=F_XS, fill=255)
+        seg_bar(d, 44, 96, W - 46, 5, 0 if s["muted"] else s["volume"] / max(1, VOL_MAX), segs=12)
 
         # --- Bottenrad ---
         is_playing = s.get("playing", True)
+        behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
+        top_hold = "LIVE" if behind_sec > 1.0 else "MUTE"
         vol_items = [
             ("rot", "VOL"),
             ("top_tap", "PAUS" if is_playing else "PLAY"),
+            ("top_hold", top_hold),
             ("btm_tap", "NEXT"),
+            ("btm_hold", "TAPE"),
         ]
         draw_control_bar(d, vol_items, W, H)
         return img, animating
