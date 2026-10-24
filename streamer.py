@@ -137,7 +137,8 @@ state = {
     "overlay_until": 0.0,
     "last_input": time.monotonic(),
     "shutting_down": False,
-    "mode": "VOL",      # "VOL" | "TAPE" | "LOOP"
+    "mode": "VOL",      # "VOL" | "TAPE" | "LOOP" | "DJ" | "GAMES"
+    "prev_mode": "TAPE", # läget vi kom ifrån vid långtryck tillbaka till VOL
     "loop_anchor_dur_ms": 0,
     "loop_anchor_live_song_ms": 0,
     "cut_flash_until": 0.0,
@@ -589,20 +590,36 @@ def on_btn_next_short():
 def on_btn_next_long():
     with lock:
         m = state["mode"]
-    if m == "GAMES" and get_games() is not None:
-        get_games().exit()     # pausar ev. spel-låt och tystar spelet
+        prev = state.get("prev_mode", "TAPE")
+
     if m == "VOL":
-        # Gå in i OB-4 TAPE mode!
-        if tape:
-            tape.set_mode(tape.MODE_TAPE)
+        # Återgå till läget vi kom ifrån (eller TAPE som standard)
+        target = prev if prev in ("TAPE", "LOOP", "DJ", "GAMES") else "TAPE"
+        if target == "TAPE":
+            if tape:
+                tape.set_mode(tape.MODE_TAPE)
+        elif target == "LOOP":
+            if tape:
+                tape.set_mode(tape.MODE_LOOP)
+        elif target == "DJ":
+            if tape:
+                tape.set_mode(tape.MODE_DJ)
+        elif target == "GAMES":
+            if tape:
+                tape.set_mode(tape.MODE_VOL)     # rent ljud för spel
+            mgr = get_games()
+            if mgr and mgr.active is None:
+                mgr.enter()
         with lock:
-            state["mode"] = "TAPE"
+            state["mode"] = target
             touch()
     else:
-        # Återgå till standard VOL (fortsätter sömlöst från aktuell punkt)
+        # Från valfritt läge (TAPE, LOOP, DJ, GAMES): spara läget och gå snabbt till VOL
+        # OBS: vi nollställer INTE aktivt minispel så att man kan höja/sänka och direkt komma tillbaka!
         if tape:
             tape.set_mode(tape.MODE_VOL)
         with lock:
+            state["prev_mode"] = m
             state["mode"] = "VOL"
             touch()
 
@@ -1351,12 +1368,14 @@ def render(t):
         is_playing = s.get("playing", True)
         behind_sec = tape.get_time_behind_live_sec() if tape else 0.0
         top_hold = "LIVE" if behind_sec > 1.0 else "MUTE"
+        prev = s.get("prev_mode", "TAPE")
+        mode_lbl = "GAME" if prev == "GAMES" else prev
         vol_items = [
             ("rot", "VOL"),
             ("top_tap", "PAUS" if is_playing else "PLAY"),
             ("top_hold", top_hold),
             ("btm_tap", "NEXT"),
-            ("btm_hold", "TAPE"),
+            ("btm_hold", mode_lbl),
         ]
         draw_control_bar(d, vol_items, W, H)
         return img, animating

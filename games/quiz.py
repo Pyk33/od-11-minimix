@@ -134,8 +134,9 @@ class MusicQuiz(Game):
 
         c.draw_control_bar(d, [
             ("top_tap", "REVL"),
+            ("top_hold", "MENU"),
             ("btm_tap", "SKIP"),
-            ("btm_hold", "MENU"),
+            ("btm_hold", "VOL"),
         ], c.W, c.H)
         return True
 
@@ -164,7 +165,8 @@ class MusicQuiz(Game):
         c.draw_control_bar(d, [
             ("rot", "PLR"),
             ("top_tap", "NEXT"),
+            ("top_hold", "MENU"),
             ("btm_tap", "+1 PT"),
-            ("btm_hold", "MENU"),
+            ("btm_hold", "VOL"),
         ], c.W, c.H)
         return True

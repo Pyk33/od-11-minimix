@@ -248,8 +248,9 @@ class SafeCracker(Game):
         c.draw_control_bar(d, [
             ("rot", "DIAL"),
             ("top_tap", "SET"),
+            ("top_hold", "MENU"),
             ("btm_tap", "RST"),
-            ("btm_hold", "MENU"),
+            ("btm_hold", "VOL"),
         ], c.W, c.H)
         return True
 
@@ -271,8 +272,9 @@ class SafeCracker(Game):
 
         c.draw_control_bar(d, [
             ("top_tap", "AGAIN"),
+            ("top_hold", "MENU"),
             ("btm_tap", "MENU"),
-            ("btm_hold", "EXIT"),
+            ("btm_hold", "VOL"),
         ], c.W, c.H)
         return True
 
@@ -289,7 +291,8 @@ class SafeCracker(Game):
 
         c.draw_control_bar(d, [
             ("top_tap", "RETRY"),
+            ("top_hold", "MENU"),
             ("btm_tap", "MENU"),
-            ("btm_hold", "EXIT"),
+            ("btm_hold", "VOL"),
         ], c.W, c.H)
         return True

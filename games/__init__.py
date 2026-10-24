@@ -271,5 +271,5 @@ class GameManager:
         if scroll + visible < len(self.classes):
             d.polygon([(c.W - 8, 68), (c.W - 12, 63), (c.W - 4, 63)], fill=255)
 
-        c.draw_control_bar(d, [("rot", "PICK"), ("top_tap", "PLAY"), ("btm_tap", "NEXT"), ("btm_hold", "EXIT")], c.W, c.H)
+        c.draw_control_bar(d, [("rot", "PICK"), ("top_tap", "PLAY"), ("btm_tap", "NEXT"), ("btm_hold", "VOL")], c.W, c.H)
         return False

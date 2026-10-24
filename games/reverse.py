@@ -230,8 +230,9 @@ class ReverseDetective(Game):
         c.draw_control_bar(d, [
             ("rot", "LOOP"),
             ("top_tap", "FLIP!"),
+            ("top_hold", "MENU"),
             ("btm_tap", "HINT"),
-            ("btm_hold", "MENU"),
+            ("btm_hold", "VOL"),
         ], c.W, c.H)
         return True
 
@@ -254,7 +255,8 @@ class ReverseDetective(Game):
 
         c.draw_control_bar(d, [
             ("top_tap", "NEXT"),
+            ("top_hold", "MENU"),
             ("btm_tap", "RPLY"),
-            ("btm_hold", "MENU"),
+            ("btm_hold", "VOL"),
         ], c.W, c.H)
         return True

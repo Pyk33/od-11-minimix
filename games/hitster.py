@@ -197,8 +197,7 @@ class Hitster(Game):
         self._ctext(d, 32, str(self.players), c.F_BIG)
         self._ctext(d, 60, f"GOAL: {self.goal} CARDS", c.F_SM)
         self._ctext(d, 78, f"{len(self.songs)} SONGS LOADED", c.F_XS)
-        self._ctext(d, 92, "PRESS PLAY TO START", c.F_XS)
-        self._sidebar(d, [("rot", "PLRS"), ("top_tap", "START"), ("btm_tap", "GOAL"), ("btm_hold", "MENU")])
+        self._sidebar(d, [("rot", "PLRS"), ("top_tap", "START"), ("top_hold", "MENU"), ("btm_tap", "GOAL"), ("btm_hold", "VOL")])
         return False
 
     def _r_pass(self, d, t):
@@ -210,7 +209,7 @@ class Hitster(Game):
         if int(t * 2) % 2 == 0:
             self._ctext(d, 66, "PRESS GO TO PLAY", c.F_SM)
         self._ribbon(d, 86, tl, None)
-        self._sidebar(d, [("top_tap", "GO"), ("btm_tap", "MENU"), ("btm_hold", "EXIT")])
+        self._sidebar(d, [("top_tap", "GO"), ("top_hold", "MENU"), ("btm_tap", "MENU"), ("btm_hold", "VOL")])
         return True
 
     def _ribbon(self, d, y, tl, slot):
@@ -264,7 +263,7 @@ class Hitster(Game):
         d.text((c.W - 6 - c.text_w(d, f"{tl[0]['year']}-{tl[-1]['year']}", c.F_XS), 95),
                f"{tl[0]['year']}-{tl[-1]['year']}", font=c.F_XS, fill=255)
 
-        self._sidebar(d, [("rot", "SLOT"), ("top_tap", "LOCK"), ("btm_tap", "AGAIN"), ("btm_hold", "MENU")])
+        self._sidebar(d, [("rot", "SLOT"), ("top_tap", "LOCK"), ("top_hold", "MENU"), ("btm_tap", "AGAIN"), ("btm_hold", "VOL")])
         return True
 
     def _ctext_in(self, d, x0, x1, y, s, font, fill=255):
@@ -285,7 +284,7 @@ class Hitster(Game):
         c.marquee(d, (4, 68), self.song["title"], c.F_SM, c.W - 8, t)
         c.marquee(d, (4, 84), self.song["artist"], c.F_XS, c.W - 8, t)
         self._ribbon(d, 94, tl, None)
-        self._sidebar(d, [("top_tap", "NEXT"), ("btm_tap", "AGAIN"), ("btm_hold", "MENU")])
+        self._sidebar(d, [("top_tap", "NEXT"), ("top_hold", "MENU"), ("btm_tap", "AGAIN"), ("btm_hold", "VOL")])
         return True
 
     def _r_win(self, d, t):
@@ -300,5 +299,5 @@ class Hitster(Game):
         self._ctext(d, 60, f"REACHED {self.goal} CARDS!", c.F_SM)
         for i, tl in enumerate(self.timelines):
             d.text((8, 78 + i * 10), f"PLAYER {i + 1}: {len(tl)} CARDS", font=c.F_XS, fill=255)
-        self._sidebar(d, [("top_tap", "AGAIN"), ("btm_tap", "MENU"), ("btm_hold", "EXIT")])
+        self._sidebar(d, [("top_tap", "AGAIN"), ("top_hold", "MENU"), ("btm_tap", "MENU"), ("btm_hold", "VOL")])
         return True
