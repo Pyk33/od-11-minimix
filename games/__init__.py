@@ -2,16 +2,18 @@
 Minispel-ramverk för OD-11 Minimix.
 
   * Game          – basklass; ett spel per fil i detta paket.
-  * GameContext   – verktyg som streamer.py lånar ut (fonter, ritfunktioner, Spotify-API).
+  * GameContext   – verktyg som streamer.py lånar ut (fonter, ritfunktioner, Spotify-API, bandmotor).
   * GameManager   – hub-skärmen + vidarebefordrar vred/knappar/rendering till aktivt spel.
 
-Lägg till ett nytt spel: skapa games/mittspel.py med en Game-subklass och lägg den i
-GAME_CLASSES nedan.
+Registrerade spel:
+  1. Hitster          - Tidslinje & årtal (1-4 spelare)
+  2. Music Quiz       - Blind-quiz på aktiv Spotify-spellista
+  3. ReverseDetective - Baklänges-musikquiz (OB-4 Reverse Tape)
+  4. SafeCracker      - Taktilt kassaskåpspussel för vridratten
 """
 import os
 import threading
 
-# Antal råa encoder-steg per "klick" i spelen (volymen använder 48 steg per procent).
 STEPS_PER_TICK = int(os.environ.get("GAME_STEPS_PER_TICK", "150"))
 
 
@@ -48,7 +50,10 @@ class Game:
 
 def _classes():
     from .hitster import Hitster
-    return [Hitster]
+    from .quiz import MusicQuiz
+    from .reverse import ReverseDetective
+    from .safecracker import SafeCracker
+    return [Hitster, MusicQuiz, ReverseDetective, SafeCracker]
 
 
 class GameManager:
@@ -112,18 +117,36 @@ class GameManager:
         c = self.ctx
         d.rectangle([0, 0, 40, 12], fill=255)
         d.text((2, 1), "GAMES", font=c.F_XS, fill=0)
+
+        # Positionsräknare t.ex. "2/4"
+        pos_str = f"{self.selected + 1}/{len(self.classes)}"
+        d.text((c.W_MAIN - c.text_w(d, pos_str, c.F_XS) - 2, 1), pos_str, font=c.F_XS, fill=255)
         d.line([(0, 14), (c.W_MAIN, 14)], fill=255)
-        y = 20
-        for i, cls in enumerate(self.classes):
-            sel = i == self.selected
+
+        # Rullande fönster för spelen
+        visible = 3
+        scroll = max(0, min(len(self.classes) - visible, self.selected - 1))
+        y = 18
+        for i in range(scroll, min(len(self.classes), scroll + visible)):
+            cls = self.classes[i]
+            sel = (i == self.selected)
             if sel:
-                d.rectangle([0, y - 2, c.W_MAIN - 2, y + 12], fill=255)
-            d.text((4, y), cls.name, font=c.F_MD, fill=0 if sel else 255)
+                d.rectangle([0, y - 1, c.W_MAIN - 2, y + 13], fill=255)
+            d.text((4, y), cls.name, font=c.F_SM, fill=0 if sel else 255)
             y += 18
-        d.text((4, y + 2), "MORE SOON", font=c.F_XS, fill=255)
+
+        # Avskiljare och beskrivning (blurb)
+        d.line([(0, 76), (c.W_MAIN, 76)], fill=255)
         blurb = self.classes[self.selected].blurb if self.classes else ""
         for j, line in enumerate(blurb.split("\n")):
-            d.text((2, 92 + j * 11), line, font=c.F_XS, fill=255)
+            d.text((2, 82 + j * 11), line, font=c.F_XS, fill=255)
+
+        # Liten pil om det finns fler spel längre ner/upp
+        if scroll > 0:
+            d.polygon([(c.W_MAIN - 8, 18), (c.W_MAIN - 12, 23), (c.W_MAIN - 4, 23)], fill=255)
+        if scroll + visible < len(self.classes):
+            d.polygon([(c.W_MAIN - 8, 70), (c.W_MAIN - 12, 65), (c.W_MAIN - 4, 65)], fill=255)
+
         c.draw_control_sidebar(d, [("rot", "PICK"), ("top_tap", "PLAY"), ("", ""),
                                    ("btm_tap", "NEXT"), ("btm_hold", "HOME")])
         return False

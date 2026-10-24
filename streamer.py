@@ -159,7 +159,7 @@ def get_games():
         ctx = games_pkg.GameContext(
             W=W, H=H, W_MAIN=W_MAIN, F_XS=F_XS, F_SM=F_SM, F_MD=F_MD, F_BIG=F_BIG, F_XL=F_XL,
             text_w=text_w, marquee=marquee, draw_control_sidebar=draw_control_sidebar,
-            api_call=api_call,
+            api_call=api_call, tape=tape, draw_tape_reel=draw_tape_reel,
         )
         _games_mgr = games_pkg.GameManager(ctx)
     return _games_mgr
